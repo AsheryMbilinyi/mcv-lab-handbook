@@ -1,6 +1,5 @@
 # Install the tools first: pip install -r requirements-dev.txt
 # Then enable the hooks once per clone: pre-commit install
-exclude: ^templates/
 repos:
   - repo: local
     hooks:

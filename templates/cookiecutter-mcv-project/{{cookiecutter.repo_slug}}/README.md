@@ -15,6 +15,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Code style
+The lab coding standard is enforced with isort, black and flake8.
+```bash
+pip install -r requirements-dev.txt
+pre-commit install   # run the checks on every commit
+isort . && black .   # fix formatting and import order
+flake8 .             # check style
+mypy .               # check types
+```
+
 ## Training
 ```bash
 python train.py

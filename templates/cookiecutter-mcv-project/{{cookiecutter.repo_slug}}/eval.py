@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Evaluation entrypoint for a finished training run."""
+
 from __future__ import annotations
 
 import argparse
@@ -6,6 +8,14 @@ from pathlib import Path
 
 
 def main() -> int:
+    """Evaluate the run directory given on the command line.
+
+    Returns:
+        The process exit code, 0 on success.
+
+    Raises:
+        FileNotFoundError: If the run directory does not exist.
+    """
     parser = argparse.ArgumentParser(
         description="Evaluation entrypoint (template)"
     )
@@ -18,7 +28,7 @@ def main() -> int:
     if not run_dir.exists():
         raise FileNotFoundError(f"Run directory not found: {run_dir}")
 
-    # TODO: load checkpoint, run evaluation, save metrics
+    # TODO: Load the checkpoint, run evaluation, and save the metrics.
     print(f"Evaluating run: {run_dir}")
     return 0
 

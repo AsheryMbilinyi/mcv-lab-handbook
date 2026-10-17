@@ -14,6 +14,9 @@ venv/
 conda-env/
 *.lock
 
+# Tool caches
+.mypy_cache/
+
 # IDE
 .vscode/
 .idea/

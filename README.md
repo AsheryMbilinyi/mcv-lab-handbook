@@ -54,10 +54,10 @@ pip install cookiecutter
 cookiecutter templates/cookiecutter-mcv-project
 ```
 
-Each new project repository must include a `README.md` with setup and usage,
-a reproducible environment file, and tool configuration such as
-`pyproject.toml` (coding standards, section 6.2). The `pyproject.toml` and
-`.flake8` in this repository are a good starting point.
+The generated project already meets the minimum requirements in section 6.2
+of the coding standard: a `README.md` with setup and usage, a
+reproducible environment file, and tool configuration (`pyproject.toml`,
+`.flake8` and pre-commit hooks for black, isort and flake8).
 
 ## Code style
 

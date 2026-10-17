@@ -1,3 +1,5 @@
+"""Seeding for reproducible runs."""
+
 from __future__ import annotations
 
 import random
@@ -11,7 +13,13 @@ except ImportError:
 
 
 def set_seed(seed: int, deterministic: bool = False) -> None:
-    """Set seeds for reproducibility."""
+    """Set seeds for reproducibility.
+
+    Args:
+        seed: Seed shared by Python, NumPy and, if installed, PyTorch.
+        deterministic: If true, make cuDNN deterministic and turn off its
+            autotuner. This can slow down training.
+    """
     random.seed(seed)
     np.random.seed(seed)
 
