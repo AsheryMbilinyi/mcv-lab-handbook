@@ -1,0 +1,283 @@
+\documentclass[11pt]{article}
+
+% -------------------- Packages --------------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{listings}
+% listings has no built-in yaml or Docker language; define them (plain, no highlighting) so latexmk builds without errors.
+\lstdefinelanguage{yaml}{}
+\lstdefinelanguage{Docker}{}
+\usepackage{courier}
+
+% -------------------- Hyperref Setup --------------------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+% -------------------- Header/Footer --------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MCV Lab}
+\rhead{Containers \& Orchestration}
+\cfoot{\thepage}
+
+% -------------------- Section Formatting --------------------
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.8em}{}
+
+\titlespacing*{\section}{0pt}{1.5em}{0.8em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.5em}
+\titlespacing*{\subsubsection}{0pt}{0.8em}{0.4em}
+
+% -------------------- Global List Formatting --------------------
+\setlist[itemize]{
+  label={-},
+  leftmargin=2em,
+  labelsep=0.6em,
+  itemsep=0.2em
+}
+\setlist[itemize,2]{itemsep=0.15em}
+\setlist[enumerate]{leftmargin=2em,itemsep=0.15em}
+
+% -------------------- Listings / Code Style --------------------
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{commentgreen}{rgb}{0.0,0.5,0.0}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  keywordstyle=\color{blue},
+  commentstyle=\color{commentgreen},
+  stringstyle=\color{red},
+  columns=fullflexible,
+  keepspaces=true,
+  tabsize=2,
+  xleftmargin=0.02\textwidth,
+  xrightmargin=0.02\textwidth
+}
+
+% -------------------- Document Metadata --------------------
+\title{\textbf{Medical Computer Vision Lab \\ \small{
+Docker vs Kubernetes: Lab Standard for Reproducible ML \& Scalable Execution}}}
+\author{Maintainer: Ashery Mbilinyi}
+\date{Version 1.0 : \today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Purpose}
+This document explains the difference between \textbf{Docker} and \textbf{Kubernetes}, and defines a practical lab standard for using containers in research workflows.
+The goal is to ensure our ML work is:
+\begin{itemize}
+  \item \textbf{Reproducible}: the same environment runs across laptops, servers, and cloud
+  \item \textbf{Portable}: experiments can move between machines with minimal friction
+  \item \textbf{Scalable}: training can be executed reliably on HPC schedulers (e.g., SLURM) and, when needed, on clusters
+  \item \textbf{Collaborative}: new lab members can run baselines quickly
+\end{itemize}
+
+\section{Key Definitions}
+
+\subsection{What is a Container?}
+A \textbf{container} packages:
+\begin{itemize}
+  \item code + dependencies (Python libraries, OS packages)
+  \item runtime settings (environment variables, entrypoints)
+  \item a filesystem snapshot (image layers)
+\end{itemize}
+This makes training and inference behave consistently across machines.
+
+\subsection{Docker (Containerization)}
+\textbf{Docker} is primarily a toolchain to \textbf{build} and \textbf{run} containers.
+
+\textbf{What Docker gives us:}
+\begin{itemize}
+  \item \textbf{Dockerfile} $\rightarrow$ builds a \textbf{Docker image}
+  \item \textbf{docker run} $\rightarrow$ runs the image as a container
+  \item reproducible dependency management (CUDA/PyTorch stacks, system libraries)
+\end{itemize}
+
+\subsection{Kubernetes (Orchestration)}
+\textbf{Kubernetes (K8s)} is a \textbf{container orchestration system}. It schedules and manages containers across a \textbf{cluster} of machines.
+
+\textbf{What Kubernetes adds on top of containers:}
+\begin{itemize}
+  \item automatic scheduling of workloads across many nodes
+  \item scaling (up/down) and self-healing (restart/reschedule)
+  \item service discovery/networking between components
+  \item rolling updates and deployment management
+\end{itemize}
+
+\section{Docker vs Kubernetes: Practical Differences}
+
+\subsection{Mental Model}
+\begin{itemize}
+  \item \textbf{Docker} = package and run the application reliably
+  \item \textbf{Kubernetes} = manage many running containers reliably at cluster scale
+\end{itemize}
+
+\subsection{Comparison Table}
+\begin{itemize}
+  \item \textbf{Docker} is typically enough for: local dev, single GPU server runs, reproducible environments.
+  \item \textbf{Kubernetes} is useful for: cluster-wide scheduling, production deployments, multi-service platforms.
+\end{itemize}
+
+\section{Lab Standard (Recommended): Docker + SLURM (Academic Default)}
+In most academic environments, the standard scaling layer is \textbf{SLURM}, not Kubernetes.
+
+\subsection{Why Docker + SLURM is the Default}
+\begin{itemize}
+  \item Docker gives reproducible environments.
+  \item SLURM schedules jobs on HPC resources (GPUs/CPUs) and handles fair-sharing.
+  \item This is simpler to operate than Kubernetes for typical lab needs.
+\end{itemize}
+
+\subsection{Important Note: Docker vs Apptainer/Singularity on HPC}
+Many HPC systems disallow Docker for security reasons.
+Instead, they use \textbf{Apptainer/Singularity} to run containerized workloads.
+
+\textbf{Practical pattern:}
+\begin{lstlisting}[language=bash]
+Docker image  -->  Apptainer/Singularity image  -->  Run via SLURM
+\end{lstlisting}
+
+\section{When We Use Docker}
+
+\subsection{Required (Lab Policy)}
+All ML repositories should provide a container recipe:
+\begin{itemize}
+  \item \texttt{Dockerfile} (preferred), or
+  \item Apptainer recipe / documented conversion steps (if HPC requires it)
+\end{itemize}
+
+\subsection{Typical Docker Commands}
+\begin{lstlisting}[language=bash]
+# Build
+docker build -t mcv-project:latest .
+
+# Run (GPU)
+docker run --gpus all -it --rm \
+  -v $(pwd):/workspace \
+  mcv-project:latest
+\end{lstlisting}
+
+\subsection{What Belongs in the Docker Image}
+\begin{itemize}
+  \item pinned Python dependencies (requirements.txt / poetry.lock / conda env)
+  \item system libs needed for the project (e.g., OpenCV deps)
+  \item fixed CUDA/PyTorch compatibility (base image choice matters)
+\end{itemize}
+
+\section{When Kubernetes is Worth It (Optional)}
+Kubernetes is not required for most lab research workflows. It becomes valuable if we run a shared platform, for example:
+\begin{itemize}
+  \item multiple groups share a GPU cluster and need a common scheduling layer
+  \item we host persistent services (APIs, dashboards, model serving endpoints)
+  \item we run many pipelines continuously (training + evaluation + deployment)
+\end{itemize}
+
+\subsection{Kubernetes Concepts (Minimal Glossary)}
+\begin{itemize}
+  \item \textbf{Pod}: smallest deployable unit (one or more containers)
+  \item \textbf{Deployment}: manages a replicated set of pods (rolling updates)
+  \item \textbf{Job}: runs a pod to completion (batch workloads)
+  \item \textbf{Service}: stable network endpoint for accessing pods
+  \item \textbf{Ingress}: routes external traffic to services
+\end{itemize}
+
+\section{Recommended Repository Structure (Containers + Experiments)}
+All projects should follow a consistent structure:
+\begin{lstlisting}
+project/
+  Dockerfile
+  requirements.txt (or environment.yml)
+  src/
+  scripts/
+    train.py
+    eval.py
+  configs/
+    baseline.yaml
+  slurm/
+    train.slurm
+  runs/               # outputs (gitignored)
+  README.md
+\end{lstlisting}
+
+\section{Best Practices}
+
+\subsection{Reproducibility}
+\begin{itemize}
+  \item Pin dependencies (exact versions).
+  \item Save runtime config per run (\texttt{config.json/yaml} + \texttt{cmd.txt}).
+  \item Save checkpoints (best + last) and log metrics.
+\end{itemize}
+
+\subsection{Security and Practical Notes}
+\begin{itemize}
+  \item Do not bake secrets (API keys) into images.
+  \item Prefer environment variables or secret managers.
+  \item Use read-only mounts where possible when evaluating.
+\end{itemize}
+
+\section{Checklist (Code Review)}
+Before merging a new training pipeline:
+\begin{itemize}
+  \item \textbf{Container exists}: repo includes \texttt{Dockerfile} (or Apptainer recipe).
+  \item \textbf{One-command run}: README has build + run instructions.
+  \item \textbf{Reproducible outputs}: runs save config + command + checkpoints.
+  \item \textbf{HPC compatibility}: provide \texttt{slurm/train.slurm} if used on cluster.
+\end{itemize}
+
+\section{Appendix: Minimal Templates}
+
+\subsection{Minimal Dockerfile (PyTorch + CUDA)}
+\begin{lstlisting}[language=Docker]
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+
+WORKDIR /workspace
+
+# System deps (adjust as needed)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /workspace/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . /workspace
+
+# Default command (override in docker run if needed)
+CMD ["python", "scripts/train.py", "--help"]
+\end{lstlisting}
+
+\subsection{Minimal SLURM Script (Runs Containerized Training)}
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+#SBATCH --job-name=mcv_train
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=12:00:00
+#SBATCH --output=slurm-%j.out
+
+module load apptainer
+
+# Example: run an Apptainer image built from Docker
+apptainer exec --nv mcv-project.sif \
+  python scripts/train.py --config configs/baseline.yaml
+\end{lstlisting}
+
+\end{document}

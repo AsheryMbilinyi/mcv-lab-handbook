@@ -1,0 +1,14 @@
+numpy
+tqdm
+
+# torch stack (adjust versions for your machine/cluster)
+torch
+torchvision
+
+# hydra + configs
+hydra-core
+omegaconf
+
+# recommended logging tools
+tensorboard
+wandb

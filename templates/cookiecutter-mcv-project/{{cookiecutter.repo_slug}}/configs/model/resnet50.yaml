@@ -1,0 +1,4 @@
+name: resnet50
+pretrained: true
+in_channels: 3
+num_classes: 2

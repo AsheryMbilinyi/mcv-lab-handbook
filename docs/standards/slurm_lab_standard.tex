@@ -1,0 +1,219 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{commentgreen}{rgb}{0.0,0.5,0.0}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  keywordstyle=\color{blue},
+  commentstyle=\color{commentgreen},
+  stringstyle=\color{red}
+}
+
+\title{\textbf{Lab Standard: SLURM Scripts for Scalable ML Experiments}}
+\author{Medical Computer Vision Lab (MCV Lab)}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+This document defines the lab standard for running ML experiments on HPC clusters using SLURM.
+All jobs must be:
+\begin{itemize}[nosep]
+    \item reproducible
+    \item logged
+    \item checkpointed
+    \item sweep-ready
+\end{itemize}
+
+\section{General Rules}
+\begin{enumerate}[label=\textbf{S\arabic*.}, leftmargin=*]
+    \item \textbf{Never edit training scripts in HPC jobs}. Use configs/overrides only.
+    \item \textbf{Always log SLURM environment variables}.
+    \item \textbf{Always write outputs into a run folder}.
+    \item \textbf{Always checkpoint (last + best)}.
+    \item \textbf{Always specify GPU, CPU, RAM explicitly}.
+\end{enumerate}
+
+\section{Folder Standard}
+SLURM logs must be stored separately from run outputs:
+
+\begin{lstlisting}
+project/
+  runs/
+  slurm_logs/
+    %x_%j.out
+    %x_%j.err
+  scripts/
+    run_train.slurm
+\end{lstlisting}
+
+\section{Baseline SLURM Job (Single Run)}
+Save as \texttt{scripts/run\_train.slurm}:
+
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+#SBATCH --job-name=mcv_train
+#SBATCH --output=slurm_logs/%x_%j.out
+#SBATCH --error=slurm_logs/%x_%j.err
+#SBATCH --time=08:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+
+# Optional: email notifications
+# SBATCH --mail-type=END,FAIL
+# SBATCH --mail-user=your_email@uvic.ca
+
+set -euo pipefail
+
+echo "=== SLURM JOB INFO ==="
+echo "JOB_ID:      ${SLURM_JOB_ID}"
+echo "JOB_NAME:    ${SLURM_JOB_NAME}"
+echo "NODELIST:    ${SLURM_NODELIST}"
+echo "GPUS:        ${SLURM_GPUS:-unknown}"
+echo "CPUS:        ${SLURM_CPUS_PER_TASK}"
+echo "WORKDIR:     ${SLURM_SUBMIT_DIR}"
+echo "START_TIME:  $(date)"
+
+cd ${SLURM_SUBMIT_DIR}
+
+# Activate environment
+# Option A: conda
+# source ~/miniconda3/etc/profile.d/conda.sh
+# conda activate mcv
+
+# Option B: module-based
+# module load python/3.10 cuda/12.1
+# pip install -r requirements.txt
+
+nvidia-smi || true
+
+# Run training
+python train.py \
+  --dataset rsna_trauma \
+  --model resnet50 \
+  --lr 1e-4 \
+  --seed 0 \
+  --amp \
+  --out_dir runs \
+  --run_name "rsna_resnet50_seed0_lr1e4_${SLURM_JOB_ID}"
+
+echo "END_TIME: $(date)"
+\end{lstlisting}
+
+\section{SLURM Array for Sweeps}
+SLURM arrays are the lab standard for running sweeps.
+
+\subsection{Example: Sweep over seeds}
+Save as \texttt{scripts/sweep\_seeds.slurm}:
+
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+#SBATCH --job-name=mcv_seed_sweep
+#SBATCH --output=slurm_logs/%x_%A_%a.out
+#SBATCH --error=slurm_logs/%x_%A_%a.err
+#SBATCH --time=08:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --array=0-4
+
+set -euo pipefail
+cd ${SLURM_SUBMIT_DIR}
+
+SEEDS=(0 1 2 3 4)
+SEED=${SEEDS[$SLURM_ARRAY_TASK_ID]}
+
+python train.py \
+  --dataset rsna_trauma \
+  --model resnet50 \
+  --lr 1e-4 \
+  --seed ${SEED} \
+  --amp \
+  --out_dir runs \
+  --run_name "rsna_resnet50_seed${SEED}_job${SLURM_JOB_ID}"
+\end{lstlisting}
+
+Submit:
+\begin{lstlisting}
+sbatch scripts/sweep_seeds.slurm
+\end{lstlisting}
+
+\section{Hydra + SLURM Recommended Pattern}
+If using Hydra multirun, we prefer either:
+\begin{itemize}[nosep]
+    \item Hydra \texttt{-m} multirun inside a single SLURM job (small sweeps)
+    \item SLURM array + Hydra overrides (large sweeps; recommended)
+\end{itemize}
+
+\subsection{SLURM array + Hydra override template}
+\begin{lstlisting}[language=bash]
+python train.py \
+  dataset=rsna_trauma \
+  model=resnet50 \
+  optim=adamw \
+  optim.lr=1e-4 \
+  seed=${SEED}
+\end{lstlisting}
+
+\section{Multi-GPU Training (DDP)}
+\subsection{Standard: torchrun}
+Save as \texttt{scripts/ddp\_train.slurm}:
+
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+#SBATCH --job-name=mcv_ddp
+#SBATCH --output=slurm_logs/%x_%j.out
+#SBATCH --error=slurm_logs/%x_%j.err
+#SBATCH --time=12:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:2
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=64G
+
+set -euo pipefail
+cd ${SLURM_SUBMIT_DIR}
+
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+
+# Use torchrun for DDP
+torchrun --nproc_per_node=2 train.py \
+  --dataset rsna_trauma \
+  --model resnet50 \
+  --lr 1e-4 \
+  --seed 0 \
+  --amp \
+  --out_dir runs \
+  --run_name "rsna_ddp2_${SLURM_JOB_ID}"
+\end{lstlisting}
+
+\section{Checklist for SLURM Job Reviews}
+Before using a SLURM script in the lab:
+\begin{itemize}
+    \item Logs go to \texttt{slurm\_logs/}
+    \item Run outputs go to \texttt{runs/}
+    \item Script logs SLURM metadata
+    \item Script runs without editing python source
+    \item Seeds are parameterized
+    \item Checkpoints saved (best + last)
+\end{itemize}
+
+\end{document}

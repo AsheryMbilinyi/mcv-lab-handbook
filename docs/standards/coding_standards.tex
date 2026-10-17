@@ -1,0 +1,348 @@
+\documentclass[11pt]{article}
+
+% -------------------- Packages --------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{courier}
+
+% -------------------- Hyperref Setup --------------------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+% -------------------- Header/Footer --------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MCV lab}
+\rhead{Python Coding Standards}
+\cfoot{\thepage}
+
+% -------------------- Section Formatting --------------------
+% NOTE: Use titlesec only (do NOT also use sectsty), otherwise formatting conflicts.
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.8em}{}
+
+% Optional: slightly reduce vertical spacing around headings (tweak if desired)
+\titlespacing*{\section}{0pt}{1.5em}{0.8em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.5em}
+
+% -------------------- Listings Settings --------------------
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=4,
+  xleftmargin=0.02\textwidth,
+  xrightmargin=0.02\textwidth
+}
+
+% -------------------- Document Metadata --------------------
+\title{\textbf{Medical Computer Vision Lab \\ \normalsize{Python Coding Standards}}}
+\author{Maintainer: Ashery Mbilinyi}
+\date{Version 1.0 : \today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+% -------------------- Abstract (new page + included in ToC) --------------------
+\addcontentsline{toc}{section}{Abstract}
+\begin{abstract}
+This document defines the Python coding standards for \textbf{Medical Computer Vision (MCV) Lab}. We follow \textbf{PEP~8} as the primary style guide and emphasize \textbf{readability, reproducibility, and maintainability}. These standards apply to all research code, prototypes intended for reuse, and production-level systems developed in the lab.
+\end{abstract}
+\newpage
+
+% ============================================================
+\section{Scope and Principles}
+
+\subsection{Scope}
+These standards apply to:
+
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Research prototypes that will be shared within the group
+  \item Code released with papers (GitHub repositories)
+  \item Internal tooling and shared utilities (datasets, evaluation, plotting)
+  \item Any code intended to be maintained beyond the original author
+\end{itemize}
+
+\subsection{Guiding Principles}
+We follow the \textbf{Zen of Python} (\texttt{import this}) as a guiding philosophy:
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item \emph{Readability counts}
+  \item \emph{Simple is better than complex}
+  \item \emph{Explicit is better than implicit}
+\end{itemize}
+
+% ============================================================
+\section{Code Layout and Formatting (PEP 8)}
+
+Python coding standards are primarily defined by \textbf{PEP~8}, the official style guide. Adhering to these standards ensures code is maintainable and easily understandable by other developers.
+
+\subsection{Indentation}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Use \textbf{4 spaces} per indentation level.
+  \item Do \textbf{not} use tabs.
+\end{itemize}
+
+\subsection{Line Length}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Limit all lines to a maximum of \textbf{79 characters}.
+  \item When lines become too long, prefer:
+  \begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.15em]
+    \item breaking long expressions into multiple lines
+    \item using parentheses for implicit line continuation
+    \item splitting long strings into smaller parts
+  \end{itemize}
+\end{itemize}
+
+\subsection{Blank Lines}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Separate top-level functions and class definitions with \textbf{two blank lines}.
+  \item Separate method definitions inside a class with \textbf{one blank line}.
+\end{itemize}
+
+\subsection{Imports}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Imports should be on \textbf{separate lines}.
+  \item Group imports in the following order:
+  \begin{enumerate}[leftmargin=2em,itemsep=0.15em]
+    \item Standard library
+    \item Third-party libraries
+    \item Local application / library-specific modules
+  \end{enumerate}
+  \item Separate groups using a \textbf{single blank line}.
+\end{itemize}
+
+\textbf{Example:}
+\begin{lstlisting}[language=Python]
+# Standard library
+from pathlib import Path
+from typing import Optional
+
+# Third-party
+import numpy as np
+import torch
+
+# Local
+from labproject.data import load_dataset
+from labproject.models import build_model
+\end{lstlisting}
+
+\subsection{Whitespace}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Avoid extraneous whitespace immediately inside parentheses/brackets/braces.
+  \item Avoid whitespace before commas, semicolons, or colons.
+\end{itemize}
+
+\textbf{Preferred:}
+\begin{lstlisting}[language=Python]
+x = (a + b) * c
+items = [1, 2, 3]
+my_dict = {"a": 1, "b": 2}
+\end{lstlisting}
+
+\textbf{Avoid:}
+\begin{lstlisting}[language=Python]
+x = ( a + b ) * c
+items = [1 , 2 , 3]
+my_dict = { "a" : 1 , "b" : 2 }
+\end{lstlisting}
+
+% ============================================================
+\section{Naming Conventions}
+
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item \textbf{Variables and functions:} \texttt{snake\_case}
+  \item \textbf{Classes:} \texttt{PascalCase}
+  \item \textbf{Constants:} \texttt{UPPER\_CASE\_WITH\_UNDERSCORES}
+  \item \textbf{Modules and packages:} short, lowercase names (underscores allowed if needed)
+  \item \textbf{Internal/private usage:} prefix with \texttt{\_} (leading underscore)
+\end{itemize}
+
+\textbf{Example:}
+\begin{lstlisting}[language=Python]
+MAX_EPOCHS = 50
+
+class TraumaClassifier(torch.nn.Module):
+    def __init__(self, in_channels: int):
+        super().__init__()
+        self._in_channels = in_channels
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x
+
+def train_one_epoch(model, dataloader):
+    for batch in dataloader:
+        pass
+\end{lstlisting}
+
+% ============================================================
+\section{Comments and Documentation}
+
+\subsection{Comments}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Comments should be \textbf{complete sentences}.
+  \item Begin comments with \texttt{\#} followed by a \textbf{single space}.
+\end{itemize}
+
+\subsection{Inline Comments}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Use inline comments sparingly.
+  \item Separate inline comments by at least \textbf{two spaces}.
+\end{itemize}
+
+\textbf{Example:}
+\begin{lstlisting}[language=Python]
+step += 1  # Increment global step counter
+\end{lstlisting}
+
+\subsection{Docstrings (PEP 257)}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Use \texttt{"""triple double quotes"""}.
+  \item Add docstrings to all public modules, classes, functions, and methods.
+  \item Docstrings must clearly describe:
+  \begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.15em]
+    \item purpose
+    \item input arguments
+    \item return values
+    \item major assumptions / side effects
+  \end{itemize}
+\end{itemize}
+
+\textbf{Example:}
+\begin{lstlisting}[language=Python]
+def load_ct_volume(path: str) -> np.ndarray:
+    """Load a CT volume from disk.
+
+    Args:
+        path: Path to a NIfTI file.
+
+    Returns:
+        The CT volume as a NumPy array.
+    """
+    return np.load(path)
+\end{lstlisting}
+
+% ============================================================
+\section{Programming Recommendations (Pythonic Code)}
+
+\subsection{Comparisons}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Use \texttt{is None} / \texttt{is not None} for \texttt{None} checks.
+\end{itemize}
+
+\textbf{Preferred:}
+\begin{lstlisting}[language=Python]
+if x is None:
+    return
+\end{lstlisting}
+
+\textbf{Avoid:}
+\begin{lstlisting}[language=Python]
+if x == None:
+    return
+\end{lstlisting}
+
+\subsection{Boolean Values}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Do not compare booleans to \texttt{True} or \texttt{False} with \texttt{==}.
+\end{itemize}
+
+\textbf{Preferred:}
+\begin{lstlisting}[language=Python]
+if greeting:
+    print("Hello")
+\end{lstlisting}
+
+\textbf{Avoid:}
+\begin{lstlisting}[language=Python]
+if greeting == True:
+    print("Hello")
+\end{lstlisting}
+
+\subsection{String Formatting}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Prefer \textbf{f-strings} for readable formatting.
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+name = "Ashery"
+score = 0.92
+print(f"{name} achieved AUROC={score:.3f}")
+\end{lstlisting}
+
+\subsection{Exceptions}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Avoid bare \texttt{except:}.
+  \item Catch specific exceptions.
+\end{itemize}
+
+\textbf{Preferred:}
+\begin{lstlisting}[language=Python]
+try:
+    value = int(x)
+except ValueError:
+    value = 0
+\end{lstlisting}
+
+\subsection{Context Managers}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item Use \texttt{with} statements for resource management (files, etc.).
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+from pathlib import Path
+
+path = Path("results.txt")
+with path.open("w", encoding="utf-8") as f:
+    f.write("done\n")
+\end{lstlisting}
+
+% ============================================================
+\section{Tools to Enforce Standards}
+
+To ensure consistency across the lab, we rely on automated tools.
+
+\subsection{Recommended Tooling}
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item \textbf{Formatter:} \texttt{black} (preferred)
+  \item \textbf{Linting:} \texttt{flake8} or \texttt{pylint}
+  \item \textbf{Import sorting:} \texttt{isort}
+  \item \textbf{Type checking:} \texttt{mypy}
+\end{itemize}
+
+\subsection{Minimum Project Requirements}
+Every shared lab project repository should include:
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item \texttt{README.md} with setup + usage
+  \item A reproducible environment file (e.g., \texttt{requirements.txt} or \texttt{environment.yml})
+  \item Tool configuration (e.g., \texttt{pyproject.toml} for \texttt{black/isort})
+\end{itemize}
+
+% ============================================================
+\section{References}
+
+\begin{itemize}[label={-},leftmargin=2em,labelsep=0.6em,itemsep=0.2em]
+  \item PEP~8 --- Style Guide for Python Code: \url{https://peps.python.org/pep-0008/}
+  \item PEP~257 --- Docstring Conventions: \url{https://peps.python.org/pep-0257/}
+  \item Zen of Python: \url{https://peps.python.org/pep-0020/}
+  \item Black: \url{https://black.readthedocs.io/}
+  \item Flake8: \url{https://flake8.pycqa.org/}
+  \item isort: \url{https://pycqa.github.io/isort/}
+  \item mypy: \url{https://mypy.readthedocs.io/}
+\end{itemize}
+
+\end{document}

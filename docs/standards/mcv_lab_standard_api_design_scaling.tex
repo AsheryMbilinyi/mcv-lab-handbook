@@ -1,0 +1,367 @@
+\documentclass[11pt]{article}
+
+% -------------------- Packages --------------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{courier}
+
+% -------------------- Hyperref Setup --------------------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+% -------------------- Header/Footer --------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MCV Lab}
+\rhead{API Design \& Scaling}
+\cfoot{\thepage}
+
+% -------------------- Section Formatting --------------------
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.8em}{}
+
+\titlespacing*{\section}{0pt}{1.5em}{0.8em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.5em}
+\titlespacing*{\subsubsection}{0pt}{0.8em}{0.4em}
+
+% -------------------- Global List Formatting --------------------
+\setlist[itemize]{
+  label={-},
+  leftmargin=2em,
+  labelsep=0.6em,
+  itemsep=0.2em
+}
+\setlist[itemize,2]{itemsep=0.15em}
+\setlist[enumerate]{leftmargin=2em,itemsep=0.15em}
+
+% -------------------- Listings / Code Style --------------------
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{commentgreen}{rgb}{0.0,0.5,0.0}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  keywordstyle=\color{blue},
+  commentstyle=\color{commentgreen},
+  stringstyle=\color{red},
+  columns=fullflexible,
+  keepspaces=true,
+  tabsize=2,
+  xleftmargin=0.02\textwidth,
+  xrightmargin=0.02\textwidth
+}
+
+% -------------------- Document Metadata --------------------
+\title{\textbf{Medical Computer Vision Lab \\ \small{
+Designing and Scaling APIs/Endpoints (Flask, Django, FastAPI): Lab Standard}}}
+\author{Maintainer: Ashery Mbilinyi}
+\date{Version 1.0 : \today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Purpose}
+This document defines MCV Lab standards for \textbf{designing} and \textbf{scaling} APIs/endpoints for ML systems.
+The goal is to ensure our services are:
+\begin{itemize}
+  \item \textbf{Correct}: consistent request/response contracts and validation
+  \item \textbf{Reliable}: robust error handling, health checks, and observability
+  \item \textbf{Maintainable}: clear project structure and versioning
+  \item \textbf{Scalable}: supports increased traffic and safe deployment patterns
+\end{itemize}
+
+\section{Core Concepts}
+
+\subsection{API and Endpoint}
+\begin{itemize}
+  \item \textbf{API}: the set of routes exposed by a service.
+  \item \textbf{Endpoint}: a specific route (e.g., \texttt{POST /predict}, \texttt{GET /health}).
+\end{itemize}
+
+\subsection{Common ML Service Endpoints (Recommended)}
+All ML inference services should implement:
+\begin{itemize}
+  \item \texttt{GET /health}: process is alive (liveness)
+  \item \texttt{GET /ready}: model is loaded and ready (readiness)
+  \item \texttt{GET /version}: service version and model version
+  \item \texttt{POST /predict}: inference on a single request
+  \item \texttt{POST /batch\_predict} (optional): batch inference for throughput
+\end{itemize}
+
+\subsection{Contract First: Request/Response Schema}
+Each endpoint must have:
+\begin{itemize}
+  \item a well-defined request schema (types, required fields, ranges)
+  \item a well-defined response schema
+  \item clear error responses with HTTP status codes
+\end{itemize}
+
+\section{Framework Selection Guide}
+
+\subsection{Flask}
+\textbf{Best for:} simple prototypes and lightweight services.\\
+\textbf{Tradeoff:} minimal structure; you must add validation and documentation manually.
+
+\subsection{Django (with Django REST Framework)}
+\textbf{Best for:} full platforms with authentication, database models, admin UI, and complex workflows.\\
+\textbf{Tradeoff:} heavier than needed for pure inference microservices.
+
+\subsection{FastAPI (Recommended Default)}
+\textbf{Best for:} modern inference microservices with typed schemas and automatic docs.\\
+\textbf{Why we like it:} Pydantic validation + OpenAPI docs + clean contracts.
+
+\section{Scaling Concepts (What ``Scaling an API'' Means)}
+
+\subsection{Concurrency}
+Ability to serve multiple requests at once.
+Common approaches:
+\begin{itemize}
+  \item multiple worker processes (e.g., Gunicorn)
+  \item async I/O (FastAPI) for network/disk-bound operations
+\end{itemize}
+\textbf{Important:} ML inference is typically CPU/GPU-bound; async does not magically speed up inference.
+
+\subsection{Horizontal Scaling}
+Run multiple replicas of the API service and load-balance across them.
+
+\subsection{Batching and Throughput (Critical for GPUs)}
+Batch inference improves throughput by using GPU efficiently.
+If latency constraints allow, prefer batching.
+
+\subsection{Load Balancing}
+Use a reverse proxy (Nginx) or platform load balancer (Kubernetes Service/Ingress).
+
+\section{Lab Policy}
+
+\subsection{Minimum Requirements for Any API Service}
+\begin{itemize}
+  \item \texttt{/health}, \texttt{/ready}, \texttt{/version}, \texttt{/predict} implemented
+  \item request validation present (FastAPI/Pydantic strongly preferred)
+  \item structured logging (JSON or consistent text format)
+  \item deterministic model versioning (model id/hash + git commit in \texttt{/version})
+  \item containerized deployment recipe (Dockerfile)
+\end{itemize}
+
+\subsection{Recommended Requirements for Production-Style Services}
+\begin{itemize}
+  \item rate limiting (basic protection)
+  \item authentication/authorization if exposing beyond local network
+  \item metrics endpoint (Prometheus) or equivalent
+  \item safe rollout and rollback strategy
+\end{itemize}
+
+\section{Coding Examples}
+
+\subsection{FastAPI Example (Recommended Inference Service)}
+\subsubsection{app.py}
+\begin{lstlisting}[language=Python]
+from __future__ import annotations
+
+import os
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+APP_VERSION = os.getenv("APP_VERSION", "dev")
+MODEL_VERSION = os.getenv("MODEL_VERSION", "unknown")
+
+app = FastAPI(title="MCV Inference API", version=APP_VERSION)
+
+# ---- Schema (Contract) ----
+class PredictRequest(BaseModel):
+    # Example: a vector input. Replace with your real schema.
+    x: List[float] = Field(..., min_length=1, description="Input feature vector.")
+    return_probs: bool = False
+
+class PredictResponse(BaseModel):
+    y: int
+    probs: Optional[List[float]] = None
+    model_version: str
+
+# ---- Model loading (placeholder) ----
+MODEL_LOADED = True
+
+def dummy_model_predict(x: List[float]) -> tuple[int, List[float]]:
+    # Replace with real model inference
+    # Example rule:
+    score = sum(x)
+    y = 1 if score > 0 else 0
+    probs = [1.0 - 0.2, 0.2] if y == 0 else [0.2, 0.8]
+    return y, probs
+
+# ---- Health endpoints ----
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.get("/ready")
+def ready():
+    if not MODEL_LOADED:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return {"status": "ready"}
+
+@app.get("/version")
+def version():
+    return {"app_version": APP_VERSION, "model_version": MODEL_VERSION}
+
+# ---- Inference ----
+@app.post("/predict", response_model=PredictResponse)
+def predict(req: PredictRequest):
+    if not MODEL_LOADED:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    y, probs = dummy_model_predict(req.x)
+
+    return PredictResponse(
+        y=y,
+        probs=probs if req.return_probs else None,
+        model_version=MODEL_VERSION,
+    )
+\end{lstlisting}
+
+\subsubsection{Run locally}
+\begin{lstlisting}[language=bash]
+pip install fastapi uvicorn pydantic
+uvicorn app:app --host 0.0.0.0 --port 8000
+\end{lstlisting}
+
+\subsubsection{Test}
+\begin{lstlisting}[language=bash]
+curl http://localhost:8000/health
+curl http://localhost:8000/version
+
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"x":[1.0,-0.5,0.2], "return_probs": true}'
+\end{lstlisting}
+
+\subsection{Flask Example (Minimal Prototype)}
+\begin{lstlisting}[language=Python]
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+MODEL_LOADED = True
+
+@app.get("/health")
+def health():
+    return jsonify({"status": "ok"})
+
+@app.get("/ready")
+def ready():
+    if not MODEL_LOADED:
+        return jsonify({"status": "not_ready"}), 503
+    return jsonify({"status": "ready"})
+
+@app.post("/predict")
+def predict():
+    payload = request.get_json(force=True)
+    x = payload.get("x")
+    if x is None:
+        return jsonify({"error": "Missing field: x"}), 400
+    y = 1 if sum(x) > 0 else 0
+    return jsonify({"y": y})
+\end{lstlisting}
+
+\subsection{Django REST Framework (DRF) Sketch}
+Use DRF if you need user accounts, permissions, and database-backed workflows.
+\begin{lstlisting}[language=Python]
+# serializers.py
+from rest_framework import serializers
+
+class PredictSerializer(serializers.Serializer):
+    x = serializers.ListField(
+        child=serializers.FloatField(), allow_empty=False
+    )
+
+# views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import PredictSerializer
+
+class PredictView(APIView):
+    def post(self, request):
+        s = PredictSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        x = s.validated_data["x"]
+        y = 1 if sum(x) > 0 else 0
+        return Response({"y": y}, status=status.HTTP_200_OK)
+\end{lstlisting}
+
+\section{Scaling Recipes}
+
+\subsection{Production Server (FastAPI)}
+For production, do not rely on a single dev server. Use multiple workers.
+\begin{lstlisting}[language=bash]
+pip install "uvicorn[standard]" gunicorn
+
+gunicorn -k uvicorn.workers.UvicornWorker \
+  -w 2 \
+  -b 0.0.0.0:8000 \
+  app:app
+\end{lstlisting}
+
+\subsection{Reverse Proxy (Nginx) --- Minimal Concept}
+Nginx can terminate TLS and load balance across multiple app workers/replicas.
+
+\subsection{Kubernetes (High Level)}
+Kubernetes scales by running multiple replicas:
+\begin{itemize}
+  \item \textbf{Deployment}: defines desired replicas
+  \item \textbf{Service}: load-balances traffic across replicas
+  \item \textbf{HPA}: autoscaling based on CPU/custom metrics
+\end{itemize}
+
+\section{Common Pitfalls and Guidance}
+
+\subsection{Async Misconceptions}
+Async helps with I/O, not with GPU-bound inference. For GPU inference:
+\begin{itemize}
+  \item use batching where possible
+  \item consider a queue-based design for heavy requests
+  \item avoid too many workers that compete for the same GPU memory
+\end{itemize}
+
+\subsection{Model Loading}
+\begin{itemize}
+  \item load model once at startup (not per request)
+  \item warm up the model (optional) to stabilize latency
+  \item expose readiness only when model is loaded
+\end{itemize}
+
+\subsection{Versioning}
+Always expose:
+\begin{itemize}
+  \item git commit hash (app version)
+  \item model artifact id/hash (model version)
+\end{itemize}
+
+\section{Checklist (Code Review)}
+Before merging an API service:
+\begin{itemize}
+  \item endpoints: \texttt{/health}, \texttt{/ready}, \texttt{/version}, \texttt{/predict}
+  \item request/response schema is documented and validated
+  \item errors return correct HTTP codes (400 vs 503 vs 500)
+  \item model loads once and readiness reflects true state
+  \item production run command documented (Gunicorn/Uvicorn)
+  \item Dockerfile present
+\end{itemize}
+
+\end{document}

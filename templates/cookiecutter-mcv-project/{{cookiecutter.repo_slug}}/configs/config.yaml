@@ -1,0 +1,19 @@
+defaults:
+  - dataset: rsna_trauma
+  - model: resnet50
+  - optim: adamw
+  - trainer: default
+  - _self_
+
+seed: 0
+deterministic: false
+
+experiment:
+  project: mcv_lab
+  name: baseline
+
+hydra:
+  run:
+    dir: runs/${experiment.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: true

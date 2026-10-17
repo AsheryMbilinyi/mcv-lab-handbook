@@ -1,0 +1,576 @@
+\documentclass[11pt]{article}
+
+% ----------------------------
+% Packages
+% ----------------------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+% ----------------------------
+% Styling
+% ----------------------------
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{commentgreen}{rgb}{0.0,0.5,0.0}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  keywordstyle=\color{blue},
+  commentstyle=\color{commentgreen},
+  stringstyle=\color{red}
+}
+
+% ----------------------------
+% Document Info
+% ----------------------------
+\title{\textbf{MCV Lab Standard: Scalable ML Experimentation}\\
+\large Reproducibility, Config Management, and HPC Execution (Argparse + Hydra + SLURM)}
+\author{Medical Computer Vision Lab (MCV Lab)}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Purpose and Scope}
+This document defines the MCV Lab standard for running machine learning experiments in a scalable, reproducible, and collaborative way.
+It applies to:
+\begin{itemize}[nosep]
+    \item all training scripts (vision, time-series, multimodal)
+    \item all experiment pipelines (pretrain, finetune, evaluate, inference)
+    \item all compute platforms (local GPU workstation, lab server, HPC/SLURM)
+\end{itemize}
+
+\section{Core Principles}
+\subsection{Non-negotiables}
+\begin{enumerate}[label=\textbf{P\arabic*.}, leftmargin=*]
+    \item \textbf{No code edits for experiments.}\\
+    Experiments must be configured through CLI arguments and/or config overrides only.
+    \item \textbf{Full reproducibility.}\\
+    Every run must be repeatable from a stored configuration.
+    \item \textbf{Traceability.}\\
+    Every run must save: configuration, launch command, outputs, checkpoints.
+    \item \textbf{Scalability.}\\
+    The code must support sweeps, multiple datasets, and automation (bash/SLURM/Hydra multirun).
+\end{enumerate}
+
+\subsection{Why this matters}
+The lab frequently runs hundreds of experiments (hyperparameter sweeps, ablations, domain shifts, modality missingness).
+Without strict standards, results become:
+\begin{itemize}[nosep]
+    \item not reproducible
+    \item hard to interpret
+    \item difficult to compare fairly
+    \item expensive in wasted compute time
+\end{itemize}
+
+\section{Experiment Taxonomy: When to Use Argparse vs Hydra}
+\subsection{Recommended default}
+\begin{itemize}[nosep]
+    \item \textbf{Argparse} for small single-script projects and quick baselines.
+    \item \textbf{Hydra} for any project expected to scale (recommended).
+\end{itemize}
+
+\subsection{Decision table}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Scenario} & \textbf{Recommended Tool} \\
+\midrule
+Quick baseline training / single dataset & Argparse \\
+Small ablation study (10--20 runs) & Argparse or Hydra \\
+Multiple datasets + models + optimizers & Hydra \\
+Multimodal fusion experiments & Hydra \\
+Continual learning setups & Hydra \\
+Large sweeps on SLURM & Hydra + SLURM arrays \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Standard Run Output Structure}
+All experiments must follow:
+
+\begin{lstlisting}
+project/
+  runs/
+    <run_name>/
+      config.json OR config_resolved.yaml
+      cmd.txt
+      checkpoints/
+        last.ckpt
+        best.ckpt
+      logs/
+        metrics.jsonl OR tensorboard OR wandb
+\end{lstlisting}
+
+\subsection{Minimum required artifacts}
+Every run directory must include:
+\begin{itemize}[nosep]
+    \item \texttt{cmd.txt}: exact command used to launch the experiment
+    \item resolved config (\texttt{config.json} or \texttt{config\_resolved.yaml})
+    \item at least one checkpoint
+\end{itemize}
+
+\section{Lab Rule: No Code Changes for Experiments}
+\subsection{Allowed}
+\begin{itemize}[nosep]
+    \item \texttt{python train.py --lr 1e-4 --seed 2}
+    \item \texttt{python train.py --config configs/baseline.json --batch\_size 64}
+    \item \texttt{python train.py model=resnet50 optim.lr=5e-5} (Hydra)
+\end{itemize}
+
+\subsection{Disallowed}
+\begin{itemize}[nosep]
+    \item editing learning rate/batch size/epochs in \texttt{train.py}
+    \item hardcoding dataset paths
+    \item commenting/uncommenting blocks to switch models
+\end{itemize}
+
+\section{Reproducibility Standard}
+\subsection{Required}
+All training scripts must support:
+\begin{itemize}[nosep]
+    \item \texttt{seed} argument
+    \item determinism toggle (\texttt{--deterministic} or Hydra field)
+    \item saving configuration and command
+\end{itemize}
+
+\subsection{Recommended}
+\begin{itemize}[nosep]
+    \item log git commit hash into run directory
+    \item log environment: Python version, torch version, CUDA version
+\end{itemize}
+
+\section{Part I: Argparse Standard (Baseline)}
+\subsection{Why argument parsers scale experimentation}
+Argument parsers enable scalability because they:
+\begin{itemize}[nosep]
+    \item remove the need for code edits
+    \item enable easy sweeps via bash/SLURM
+    \item enforce safe typed arguments (avoid invalid runs)
+    \item support config-file driven defaults with CLI overrides
+\end{itemize}
+
+\subsection{Required arguments (minimum)}
+Every argparse training script should include:
+
+\begin{itemize}[nosep]
+    \item Experiment: \texttt{--run\_name}, \texttt{--out\_dir}
+    \item Dataset: \texttt{--dataset}, \texttt{--data\_dir}, \texttt{--num\_workers}
+    \item Model: \texttt{--model}, \texttt{--pretrained}
+    \item Optimization: \texttt{--epochs}, \texttt{--batch\_size}, \texttt{--lr}, \texttt{--weight\_decay}
+    \item Reproducibility: \texttt{--seed}, \texttt{--deterministic}
+    \item Hardware: \texttt{--device}, \texttt{--amp}
+    \item Resume: \texttt{--resume}
+    \item Config support: \texttt{--config} (mandatory)
+\end{itemize}
+
+\subsection{Reference template (argparse)}
+Below is the lab reference entrypoint template (students may adapt but preserve principles):
+
+\begin{lstlisting}[language=Python]
+#!/usr/bin/env python3
+"""
+train.py - scalable training entrypoint template
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import shutil
+import sys
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
+
+def set_seed(seed: int, deterministic: bool = False) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    if torch is not None:
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        if deterministic:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+
+@dataclass
+class TrainConfig:
+    run_name: str
+    out_dir: str
+    dataset: str
+    data_dir: str
+    model: str
+    epochs: int
+    batch_size: int
+    lr: float
+    weight_decay: float
+    seed: int
+    deterministic: bool
+    device: str
+    amp: bool
+    resume: str | None
+
+
+def timestamp() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def ensure_dir(path: str | Path) -> Path:
+    path = Path(path)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def dump_json(path: Path, obj: dict[str, Any]) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=2, sort_keys=True)
+
+
+def load_json(path: str | Path) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--run_name", type=str, default="")
+    parser.add_argument("--out_dir", type=str, default="runs")
+
+    parser.add_argument("--dataset", type=str, default="dummy",
+                        choices=["dummy", "ptbxl", "mimic_ecg", "rsna_trauma"])
+    parser.add_argument("--data_dir", type=str, default="data")
+
+    parser.add_argument("--model", type=str, default="resnet18",
+                        choices=["resnet18", "resnet50", "vit_b16"])
+
+    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--weight_decay", type=float, default=1e-4)
+
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--deterministic", action="store_true")
+
+    parser.add_argument("--device", type=str, default="cuda",
+                        choices=["cuda", "cpu", "mps"])
+    parser.add_argument("--amp", action="store_true")
+
+    parser.add_argument("--resume", type=str, default=None)
+
+    parser.add_argument("--config", type=str, default=None,
+                        help="Optional JSON config to load defaults from.")
+
+    return parser
+
+
+def parse_args_with_config(parser: argparse.ArgumentParser, argv: list[str]) -> argparse.Namespace:
+    partial, _ = parser.parse_known_args(argv)
+    if partial.config is not None:
+        cfg = load_json(partial.config)
+        parser.set_defaults(**cfg)
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str]) -> int:
+    parser = build_parser()
+    args = parse_args_with_config(parser, argv)
+
+    if args.run_name.strip() == "":
+        args.run_name = f"{args.dataset}_{args.model}_lr{args.lr}_{timestamp()}"
+
+    run_dir = ensure_dir(Path(args.out_dir) / args.run_name)
+    ensure_dir(run_dir / "checkpoints")
+
+    if args.config is not None:
+        shutil.copy(args.config, run_dir / "config_used.json")
+
+    cfg = TrainConfig(
+        run_name=args.run_name,
+        out_dir=str(run_dir),
+        dataset=args.dataset,
+        data_dir=args.data_dir,
+        model=args.model,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        seed=args.seed,
+        deterministic=args.deterministic,
+        device=args.device,
+        amp=args.amp,
+        resume=args.resume,
+    )
+
+    dump_json(run_dir / "config.json", asdict(cfg))
+    (run_dir / "cmd.txt").write_text("python " + " ".join(argv) + "\n")
+
+    # TODO: training logic
+    print(f"Training would run here. Outputs: {run_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
+\end{lstlisting}
+
+\section{Part II: Hydra Standard (Recommended)}
+\subsection{Why Hydra scales better than argparse}
+Hydra enables:
+\begin{itemize}[nosep]
+    \item hierarchical configs (dataset/model/optim/trainer)
+    \item composable config groups
+    \item built-in multi-run sweeps (\texttt{-m})
+    \item automatic run directory management and config saving
+\end{itemize}
+
+\subsection{Required project structure}
+\begin{lstlisting}
+project/
+  train.py
+  configs/
+    config.yaml
+    dataset/
+      rsna_trauma.yaml
+      mimic_ecg.yaml
+    model/
+      resnet50.yaml
+      vit_b16.yaml
+    optim/
+      adamw.yaml
+      sgd.yaml
+    trainer/
+      default.yaml
+\end{lstlisting}
+
+\subsection{Hydra entrypoint template}
+\begin{lstlisting}[language=Python]
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import random
+from pathlib import Path
+
+import numpy as np
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
+
+def set_seed(seed: int, deterministic: bool = False) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    if torch is not None:
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        if deterministic:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+
+@hydra.main(version_base=None, config_path="configs", config_name="config")
+def main(cfg: DictConfig) -> None:
+    run_dir = Path(os.getcwd())
+
+    (run_dir / "config_resolved.yaml").write_text(
+        OmegaConf.to_yaml(cfg), encoding="utf-8"
+    )
+
+    set_seed(int(cfg.seed), deterministic=bool(cfg.deterministic))
+
+    print("Run dir:", run_dir)
+    print(OmegaConf.to_yaml(cfg))
+
+    # TODO: build dataset/model/optim/trainer based on cfg groups
+
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\subsection{Hydra base config}
+\begin{lstlisting}
+# configs/config.yaml
+defaults:
+  - dataset: rsna_trauma
+  - model: resnet50
+  - optim: adamw
+  - trainer: default
+  - _self_
+
+seed: 0
+deterministic: false
+\end{lstlisting}
+
+\subsection{Example Hydra multirun sweeps}
+\begin{lstlisting}
+python train.py -m optim.lr=1e-3,1e-4,1e-5 seed=0,1,2
+python train.py -m model=resnet50,vit_b16 dataset=rsna_trauma,mimic_ecg
+\end{lstlisting}
+
+\section{Part III: SLURM Standard (HPC Execution)}
+\subsection{Required folder structure}
+\begin{lstlisting}
+project/
+  runs/
+  slurm_logs/
+  scripts/
+    run_train.slurm
+    sweep_seeds.slurm
+    ddp_train.slurm
+\end{lstlisting}
+
+\subsection{Baseline SLURM job (single run)}
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+#SBATCH --job-name=mcv_train
+#SBATCH --output=slurm_logs/%x_%j.out
+#SBATCH --error=slurm_logs/%x_%j.err
+#SBATCH --time=08:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+
+set -euo pipefail
+
+echo "JOB_ID: ${SLURM_JOB_ID}"
+echo "NODELIST: ${SLURM_NODELIST}"
+echo "START_TIME: $(date)"
+
+cd ${SLURM_SUBMIT_DIR}
+nvidia-smi || true
+
+python train.py \
+  --dataset rsna_trauma \
+  --model resnet50 \
+  --lr 1e-4 \
+  --seed 0 \
+  --amp \
+  --out_dir runs \
+  --run_name "rsna_resnet50_seed0_lr1e4_${SLURM_JOB_ID}"
+
+echo "END_TIME: $(date)"
+\end{lstlisting}
+
+\subsection{SLURM arrays for sweeps (recommended)}
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+#SBATCH --job-name=mcv_seed_sweep
+#SBATCH --output=slurm_logs/%x_%A_%a.out
+#SBATCH --error=slurm_logs/%x_%A_%a.err
+#SBATCH --time=08:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --array=0-4
+
+set -euo pipefail
+cd ${SLURM_SUBMIT_DIR}
+
+SEEDS=(0 1 2 3 4)
+SEED=${SEEDS[$SLURM_ARRAY_TASK_ID]}
+
+python train.py \
+  --dataset rsna_trauma \
+  --model resnet50 \
+  --lr 1e-4 \
+  --seed ${SEED} \
+  --amp \
+  --out_dir runs \
+  --run_name "rsna_resnet50_seed${SEED}_job${SLURM_JOB_ID}"
+\end{lstlisting}
+
+\subsection{Hydra + SLURM (best practice)}
+Use SLURM arrays for large sweeps, Hydra overrides for config control:
+\begin{lstlisting}[language=bash]
+python train.py dataset=rsna_trauma model=resnet50 optim=adamw optim.lr=1e-4 seed=${SEED}
+\end{lstlisting}
+
+\subsection{Multi-GPU training (DDP)}
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+#SBATCH --job-name=mcv_ddp
+#SBATCH --output=slurm_logs/%x_%j.out
+#SBATCH --error=slurm_logs/%x_%j.err
+#SBATCH --time=12:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:2
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=64G
+
+set -euo pipefail
+cd ${SLURM_SUBMIT_DIR}
+
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+
+torchrun --nproc_per_node=2 train.py \
+  --dataset rsna_trauma \
+  --model resnet50 \
+  --lr 1e-4 \
+  --seed 0 \
+  --amp \
+  --out_dir runs \
+  --run_name "rsna_ddp2_${SLURM_JOB_ID}"
+\end{lstlisting}
+
+\section{Checklists}
+\subsection{Checklist: experiment readiness}
+\begin{itemize}
+    \item Runs end-to-end without code edits
+    \item Outputs go to \texttt{runs/<run\_name>/}
+    \item Saves resolved config + cmd
+    \item Logs seed, dataset, model, learning rate
+    \item Saves checkpoints (best + last)
+\end{itemize}
+
+\subsection{Checklist: code review / PR checklist}
+Before merging experiment code:
+\begin{itemize}
+    \item Argument/config surface is documented
+    \item Dataset paths not hardcoded
+    \item All new arguments have defaults and help messages
+    \item Config groups exist (Hydra) for dataset/model/optim
+    \item SLURM scripts write logs into \texttt{slurm\_logs/}
+\end{itemize}
+
+\section{Recommended Extensions (Optional)}
+\begin{itemize}
+    \item Use W\&B or MLflow and log full config per run
+    \item Save git commit hash in run directory
+    \item Save environment info in \texttt{env.txt}
+    \item Add automated experiment summary script (table of metrics across runs)
+\end{itemize}
+
+\end{document}

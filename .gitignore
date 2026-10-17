@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+
+# Environments
+.env
+.venv/
+venv/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+
+# LaTeX build artifacts (built PDFs in docs/standards/pdf are kept)
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg

@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Environments
+.env
+.venv
+venv/
+conda-env/
+*.lock
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Experiment artifacts
+runs/
+slurm_logs/
+checkpoints/
+wandb/
+mlruns/
+logs/
+
+# Data
+data/
+datasets/
+*.h5
+*.npz
+
+# Large model artifacts
+*.ckpt
+*.pth
+*.pt
+*.onnx
+
+# Hydra outputs (if not redirected to runs/)
+outputs/
+multirun/

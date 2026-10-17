@@ -1,0 +1,20 @@
+[tool.black]
+# The lab coding standard (section 2.2) limits lines to 79 characters,
+# so black is configured to match instead of using its 88 default.
+line-length = 79
+target-version = ["py310"]
+extend-exclude = '''
+/(
+    templates
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 79
+skip_glob = ["templates/*"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+exclude = ["^templates/"]

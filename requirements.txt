@@ -1,0 +1,3 @@
+# Needed to run the debugging drills in drills/.
+numpy
+torch

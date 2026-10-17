@@ -1,0 +1,435 @@
+\documentclass[11pt]{article}
+
+% -------------------- Packages --------------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{listings}
+% listings has no built-in yaml or Docker language; define them (plain, no highlighting) so latexmk builds without errors.
+\lstdefinelanguage{yaml}{}
+\lstdefinelanguage{Docker}{}
+\usepackage{courier}
+
+% -------------------- Hyperref Setup --------------------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+% -------------------- Header/Footer --------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MCV Lab}
+\rhead{Cloud ML Deployment Infrastructure}
+\cfoot{\thepage}
+
+% -------------------- Section Formatting --------------------
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.8em}{}
+
+\titlespacing*{\section}{0pt}{1.5em}{0.8em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.5em}
+\titlespacing*{\subsubsection}{0pt}{0.8em}{0.4em}
+
+% -------------------- Global List Formatting --------------------
+\setlist[itemize]{
+  label={-},
+  leftmargin=2em,
+  labelsep=0.6em,
+  itemsep=0.2em
+}
+\setlist[itemize,2]{itemsep=0.15em}
+\setlist[enumerate]{leftmargin=2em,itemsep=0.15em}
+
+% -------------------- Listings / Code Style --------------------
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{commentgreen}{rgb}{0.0,0.5,0.0}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  keywordstyle=\color{blue},
+  commentstyle=\color{commentgreen},
+  stringstyle=\color{red},
+  columns=fullflexible,
+  keepspaces=true,
+  tabsize=2,
+  xleftmargin=0.02\textwidth,
+  xrightmargin=0.02\textwidth
+}
+
+% -------------------- Document Metadata --------------------
+\title{\textbf{Medical Computer Vision Lab \\ \small{
+Cloud Platforms (AWS, Azure, GCP) and AI/ML Model Deployment Infrastructure: Lab Standard}}}
+\author{Maintainer: Ashery Mbilinyi}
+\date{Version 1.0 : \today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Purpose}
+This document explains cloud platforms (AWS, Azure, GCP) in the context of AI/ML workloads, and defines practical lab standards for \textbf{model deployment infrastructure} in the cloud.
+The goal is to ensure our cloud deployments are:
+\begin{itemize}
+  \item \textbf{Reproducible}: consistent environments and versioned model artifacts
+  \item \textbf{Secure}: least-privilege access and safe secret handling
+  \item \textbf{Scalable}: supports increased traffic, batching, and multi-replica serving
+  \item \textbf{Observable}: logs, metrics, and basic monitoring are always present
+  \item \textbf{Rollback-ready}: model versions can be promoted and reverted safely
+\end{itemize}
+
+\section{What ``Cloud Platforms'' Provide for ML}
+Cloud platforms provide standardized building blocks:
+
+\subsection{Compute}
+Where code runs:
+\begin{itemize}
+  \item CPU VMs for web services and light inference
+  \item GPU VMs for training and GPU inference
+  \item managed container compute (serverless containers)
+\end{itemize}
+
+\subsection{Storage}
+Where data and artifacts live:
+\begin{itemize}
+  \item datasets, checkpoints, logs
+  \item model artifacts (e.g., \texttt{.pt}, \texttt{.onnx}, tokenizers)
+\end{itemize}
+
+\subsection{Networking}
+How services are exposed and connected:
+\begin{itemize}
+  \item load balancers, DNS, HTTPS termination
+  \item private networks (VPC/VNet), firewall rules
+\end{itemize}
+
+\subsection{Identity \& Access Management (IAM)}
+Who can access resources:
+\begin{itemize}
+  \item service accounts/roles
+  \item permission policies
+  \item principle of least privilege
+\end{itemize}
+
+\section{What ``Model Deployment Infrastructure'' Means}
+Model deployment infrastructure is the full system required to serve a model reliably:
+\begin{itemize}
+  \item \textbf{Model packaging}: containerize inference + preprocessing code
+  \item \textbf{Artifact storage}: store model files and metadata
+  \item \textbf{Serving layer}: API endpoint (REST/gRPC)
+  \item \textbf{Scaling}: autoscaling + load balancing + batching strategies
+  \item \textbf{Monitoring}: latency, error rates, drift signals (when available)
+  \item \textbf{Versioning}: model registry + rollout/rollback
+\end{itemize}
+
+\section{Equivalent Services: AWS vs Azure vs GCP}
+
+\subsection{Core Infrastructure Mapping (Quick Reference)}
+\begin{itemize}
+  \item \textbf{Compute VMs}: AWS EC2 / Azure VMs / GCP Compute Engine
+  \item \textbf{Storage}: AWS S3 / Azure Blob Storage / GCP Cloud Storage
+  \item \textbf{Container Registry}: AWS ECR / Azure ACR / GCP Artifact Registry
+  \item \textbf{Kubernetes}: AWS EKS / Azure AKS / GCP GKE
+  \item \textbf{Managed ML Platform}: AWS SageMaker / Azure ML / GCP Vertex AI
+  \item \textbf{Secrets}: AWS Secrets Manager / Azure Key Vault / GCP Secret Manager
+\end{itemize}
+
+\section{Three Deployment Patterns (Most Common)}
+
+\subsection{Pattern A: Managed ML Endpoints (Fastest to Production)}
+Use cloud-managed model serving when you want simplicity and minimal DevOps.
+
+Examples:
+\begin{itemize}
+  \item AWS SageMaker Endpoints
+  \item Azure ML Online Endpoints
+  \item GCP Vertex AI Endpoints
+\end{itemize}
+
+\textbf{Pros:}
+\begin{itemize}
+  \item fastest setup
+  \item built-in scaling/monitoring integrations
+  \item standardized deployment workflow
+\end{itemize}
+
+\textbf{Cons:}
+\begin{itemize}
+  \item less control over runtime details
+  \item cost can be higher for always-on endpoints
+\end{itemize}
+
+\subsection{Pattern B: Kubernetes + Containers (Most Flexible)}
+Deploy a containerized inference API (FastAPI) on Kubernetes.
+
+\textbf{Pros:}
+\begin{itemize}
+  \item maximum control and portability
+  \item strong scaling patterns and reliability
+  \item standard infra across clouds
+\end{itemize}
+
+\textbf{Cons:}
+\begin{itemize}
+  \item operational complexity
+  \item requires cluster management knowledge
+\end{itemize}
+
+\subsection{Pattern C: Serverless Containers (Great Middle Ground)}
+Run inference as a container on managed serverless container compute.
+
+Examples:
+\begin{itemize}
+  \item AWS: ECS Fargate (serverless containers)
+  \item Azure: Container Apps
+  \item GCP: Cloud Run
+\end{itemize}
+
+\textbf{Pros:}
+\begin{itemize}
+  \item minimal ops
+  \item easy autoscaling
+  \item good for CPU inference and many API workloads
+\end{itemize}
+
+\textbf{Cons:}
+\begin{itemize}
+  \item GPU inference support varies by platform/region and can be costly
+  \item cold starts may matter for low-traffic services
+\end{itemize}
+
+\section{Lab Standard: Recommended Default Choices}
+\subsection{Default Recommendations}
+\begin{itemize}
+  \item \textbf{Internal lab demos}: Docker + FastAPI on a single VM (CPU/GPU as needed)
+  \item \textbf{Simple production-style API}: serverless containers (Cloud Run / Container Apps / Fargate)
+  \item \textbf{Research platform at scale}: Kubernetes (GKE/EKS/AKS) or Managed Endpoints
+\end{itemize}
+
+\subsection{GPU Inference Guidance}
+Scaling GPU inference requires careful control:
+\begin{itemize}
+  \item avoid too many workers competing for the same GPU memory
+  \item prefer batching where latency allows
+  \item consider queue-based designs for heavy workloads
+\end{itemize}
+
+\section{Deployment Building Blocks (What Every Cloud Deployment Needs)}
+\subsection{(1) Model Artifacts and Metadata}
+We store:
+\begin{itemize}
+  \item model weights (\texttt{model.pt} / \texttt{model.onnx})
+  \item preprocessing config (normalization, transforms)
+  \item label map / class definitions
+  \item model card metadata (dataset, metrics, caveats)
+\end{itemize}
+
+\subsection{(2) Containerized Inference Service}
+We serve inference via a container image:
+\begin{itemize}
+  \item FastAPI app exposes \texttt{/health}, \texttt{/ready}, \texttt{/version}, \texttt{/predict}
+  \item container pulls model artifact at startup or includes it in the image (decision depends on update frequency)
+\end{itemize}
+
+\subsection{(3) Traffic Management}
+\begin{itemize}
+  \item HTTPS/TLS termination (managed load balancer or ingress)
+  \item routing and versioning (v1/v2)
+  \item optional canary rollouts
+\end{itemize}
+
+\subsection{(4) Observability}
+Minimum:
+\begin{itemize}
+  \item structured logs
+  \item latency and error rate metrics
+\end{itemize}
+Recommended:
+\begin{itemize}
+  \item tracing (distributed traces for microservices)
+  \item drift monitoring when feasible
+\end{itemize}
+
+\subsection{(5) Security}
+\begin{itemize}
+  \item IAM roles for services (least privilege)
+  \item secrets stored in managed secret store (not in code or Docker images)
+  \item private networking when possible
+\end{itemize}
+
+\section{Coding Examples}
+
+\subsection{Minimal FastAPI Inference App (Cloud-Friendly)}
+\begin{lstlisting}[language=Python]
+# app.py
+from __future__ import annotations
+
+import os
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+APP_VERSION = os.getenv("APP_VERSION", "dev")
+MODEL_VERSION = os.getenv("MODEL_VERSION", "unknown")
+
+app = FastAPI(title="MCV Cloud Inference API", version=APP_VERSION)
+
+MODEL_LOADED = False
+
+class PredictRequest(BaseModel):
+    x: List[float] = Field(..., min_length=1)
+    return_probs: bool = False
+
+class PredictResponse(BaseModel):
+    y: int
+    probs: Optional[List[float]] = None
+    model_version: str
+
+def load_model() -> None:
+    # Replace with: download weights from S3/Blob/GCS or mount volume.
+    global MODEL_LOADED
+    MODEL_LOADED = True
+
+def predict_impl(x: List[float]) -> tuple[int, List[float]]:
+    score = sum(x)
+    y = 1 if score > 0 else 0
+    probs = [0.2, 0.8] if y == 1 else [0.8, 0.2]
+    return y, probs
+
+@app.on_event("startup")
+def startup_event():
+    load_model()
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.get("/ready")
+def ready():
+    if not MODEL_LOADED:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return {"status": "ready"}
+
+@app.get("/version")
+def version():
+    return {"app_version": APP_VERSION, "model_version": MODEL_VERSION}
+
+@app.post("/predict", response_model=PredictResponse)
+def predict(req: PredictRequest):
+    if not MODEL_LOADED:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    y, probs = predict_impl(req.x)
+    return PredictResponse(
+        y=y,
+        probs=probs if req.return_probs else None,
+        model_version=MODEL_VERSION,
+    )
+\end{lstlisting}
+
+\subsection{Dockerfile (Inference Service)}
+\begin{lstlisting}[language=Docker]
+FROM python:3.10-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir fastapi uvicorn[standard] pydantic
+
+COPY app.py /app/app.py
+
+EXPOSE 8080
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+\end{lstlisting}
+
+\subsection{Local Run}
+\begin{lstlisting}[language=bash]
+docker build -t mcv-inference:latest .
+docker run -p 8080:8080 \
+  -e APP_VERSION=dev \
+  -e MODEL_VERSION=v0 \
+  mcv-inference:latest
+\end{lstlisting}
+
+\subsection{Example: Deploy to GCP Cloud Run (Conceptual)}
+\begin{lstlisting}[language=bash]
+# Build and push to Artifact Registry (names simplified)
+gcloud auth configure-docker
+docker tag mcv-inference:latest REGION-docker.pkg.dev/PROJECT/REPO/mcv-inference:latest
+docker push REGION-docker.pkg.dev/PROJECT/REPO/mcv-inference:latest
+
+# Deploy
+gcloud run deploy mcv-inference \
+  --image REGION-docker.pkg.dev/PROJECT/REPO/mcv-inference:latest \
+  --platform managed \
+  --region REGION \
+  --allow-unauthenticated
+\end{lstlisting}
+
+\subsection{Example: Deploy to AWS (Conceptual ECS/Fargate)}
+\begin{lstlisting}[language=bash]
+# Build -> push to ECR -> create ECS service (high-level sketch)
+# 1) Push image to ECR
+# 2) Define task definition (CPU/mem/env vars)
+# 3) Create service behind load balancer
+# 4) Enable autoscaling rules
+\end{lstlisting}
+
+\subsection{Example: Deploy to Azure (Conceptual Container Apps)}
+\begin{lstlisting}[language=bash]
+# Build -> push to ACR -> deploy to Azure Container Apps (high-level sketch)
+# 1) Push image to ACR
+# 2) Create Container App with ingress enabled
+# 3) Configure autoscaling rules
+\end{lstlisting}
+
+\section{CI/CD for Cloud Deployments (Minimal Standard)}
+A typical pipeline:
+\begin{enumerate}
+  \item CI: lint + unit tests + inference smoke test
+  \item Build: Docker image
+  \item Push: image to registry (ECR/ACR/Artifact Registry)
+  \item Deploy: update service (Cloud Run / ECS / Container Apps / K8s)
+\end{enumerate}
+
+\subsection{Minimal GitHub Actions Sketch (Build Only)}
+\begin{lstlisting}[language=yaml]
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -t mcv-inference:latest .
+\end{lstlisting}
+
+\section{Checklist (Code Review)}
+Before merging a cloud deployment project:
+\begin{itemize}
+  \item Inference API implements \texttt{/health}, \texttt{/ready}, \texttt{/version}, \texttt{/predict}
+  \item Dockerfile exists and builds successfully
+  \item Model version is exposed (\texttt{/version}) and traceable to an artifact
+  \item Secrets are not in the repo or image
+  \item Logging exists and is structured enough to debug failures
+  \item Scaling approach is documented (replicas/autoscaling/batching)
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,6 @@
+{
+  "project_name": "mcv_project",
+  "repo_slug": "mcv-project",
+  "author_name": "MCV Lab",
+  "description": "MCV Lab experiment template (Hydra + SLURM)"
+}

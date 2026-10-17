@@ -1,0 +1,442 @@
+\documentclass[11pt]{article}
+
+% -------------------- Packages --------------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{listings}
+% listings has no built-in yaml or Docker language; define them (plain, no highlighting) so latexmk builds without errors.
+\lstdefinelanguage{yaml}{}
+\lstdefinelanguage{Docker}{}
+\usepackage{courier}
+
+% -------------------- Hyperref Setup --------------------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+% -------------------- Header/Footer --------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MCV Lab}
+\rhead{CI/CD, Containers, and MLOps}
+\cfoot{\thepage}
+
+% -------------------- Section Formatting --------------------
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.8em}{}
+
+\titlespacing*{\section}{0pt}{1.5em}{0.8em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.5em}
+\titlespacing*{\subsubsection}{0pt}{0.8em}{0.4em}
+
+% -------------------- Global List Formatting --------------------
+\setlist[itemize]{
+  label={-},
+  leftmargin=2em,
+  labelsep=0.6em,
+  itemsep=0.2em
+}
+\setlist[itemize,2]{itemsep=0.15em}
+\setlist[enumerate]{leftmargin=2em,itemsep=0.15em}
+
+% -------------------- Listings / Code Style --------------------
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{commentgreen}{rgb}{0.0,0.5,0.0}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  keywordstyle=\color{blue},
+  commentstyle=\color{commentgreen},
+  stringstyle=\color{red},
+  columns=fullflexible,
+  keepspaces=true,
+  tabsize=2,
+  xleftmargin=0.02\textwidth,
+  xrightmargin=0.02\textwidth
+}
+
+% -------------------- Document Metadata --------------------
+\title{\textbf{Medical Computer Vision Lab \\ \small{
+CI/CD, Containerization, and MLOps Practices: Lab Standard}}}
+\author{Maintainer: Ashery Mbilinyi}
+\date{Version 1.0 : \today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Purpose}
+This document defines how we operationalize machine learning (ML) systems in the MCV Lab by combining:
+\begin{itemize}
+  \item \textbf{CI/CD} (automation of testing, integration, and delivery)
+  \item \textbf{Containerization} (Docker, Kubernetes) for portability and scalability
+  \item \textbf{MLOps practices} for full lifecycle model management
+\end{itemize}
+
+The goal is to ensure our ML work is:
+\begin{itemize}
+  \item \textbf{Reproducible}: experiments can be rerun months later with identical setup
+  \item \textbf{Reliable}: training and inference are stable and testable
+  \item \textbf{Deployable}: models can move from research to production systematically
+  \item \textbf{Maintainable}: changes are reviewed, tested, and traceable
+\end{itemize}
+
+\section{Key Concept Summary (One Page)}
+\subsection{Core Definitions}
+\begin{itemize}
+  \item \textbf{CI (Continuous Integration)}: automatically test and validate code changes on every push/PR.
+  \item \textbf{CD (Continuous Delivery/Deployment)}: automatically package and deliver validated code to environments (staging/prod).
+  \item \textbf{Containerization}: package the runtime environment so code runs consistently across machines.
+  \item \textbf{Docker}: toolchain to build/run containers locally or on servers.
+  \item \textbf{Kubernetes (K8s)}: orchestration platform to run containers reliably across a cluster.
+  \item \textbf{MLOps}: practices/tools for managing the end-to-end lifecycle of ML models (data $\rightarrow$ training $\rightarrow$ evaluation $\rightarrow$ deployment $\rightarrow$ monitoring).
+\end{itemize}
+
+\subsection{The Relationship (Mental Model)}
+\begin{itemize}
+  \item \textbf{Docker} answers: \emph{``How do we package and run this ML system reproducibly?''}
+  \item \textbf{Kubernetes} answers: \emph{``How do we run this at scale and keep it alive reliably?''}
+  \item \textbf{CI/CD} answers: \emph{``How do we automate testing and delivery when code changes?''}
+  \item \textbf{MLOps} answers: \emph{``How do we manage models like real software products?''}
+\end{itemize}
+
+\section{Containerization in ML}
+
+\subsection{What Containerization Solves}
+ML projects often break due to environment mismatches:
+\begin{itemize}
+  \item different CUDA versions
+  \item different PyTorch versions
+  \item missing system libraries (OpenCV, libjpeg, etc.)
+  \item dependency conflicts across projects
+\end{itemize}
+
+A container solves this by packaging:
+\begin{itemize}
+  \item OS-level dependencies
+  \item Python dependencies
+  \item runtime settings and entrypoint scripts
+\end{itemize}
+
+\subsection{Docker: Packaging and Reproducible Execution}
+\textbf{Docker} is used to:
+\begin{itemize}
+  \item build container images from a \texttt{Dockerfile}
+  \item run training/evaluation in isolated environments
+  \item support consistent onboarding of new lab members
+\end{itemize}
+
+\subsubsection{Minimum Docker Standard (Lab Policy)}
+Every ML project repository should include:
+\begin{itemize}
+  \item a \texttt{Dockerfile}
+  \item pinned dependencies (\texttt{requirements.txt}, \texttt{poetry.lock}, or \texttt{environment.yml})
+  \item documented run commands in \texttt{README.md}
+\end{itemize}
+
+\subsection{Kubernetes: Orchestration for Scale}
+\textbf{Kubernetes (K8s)} manages running containers across a cluster.
+It enables:
+\begin{itemize}
+  \item scheduling jobs across multiple nodes
+  \item automatic restart/reschedule if a node fails
+  \item autoscaling (e.g., increase number of inference replicas)
+  \item rolling updates (deploy new version with zero downtime)
+\end{itemize}
+
+\subsubsection{When Kubernetes is Relevant for the Lab}
+Kubernetes is most useful when:
+\begin{itemize}
+  \item running a shared GPU cluster platform
+  \item serving models as APIs used by others
+  \item running continuous pipelines with multiple services (training + registry + evaluation + serving)
+\end{itemize}
+
+\subsubsection{When Kubernetes is Not Necessary}
+Kubernetes is often \textbf{not required} when:
+\begin{itemize}
+  \item training is run on single machines or HPC nodes
+  \item the lab uses SLURM scheduling (academic default)
+  \item no persistent production model serving is needed
+\end{itemize}
+
+\section{CI/CD in ML (What It Means in Practice)}
+
+\subsection{CI: Continuous Integration}
+CI is an automation pipeline triggered by:
+\begin{itemize}
+  \item every commit / push
+  \item every pull request (PR)
+\end{itemize}
+
+CI ensures that the codebase stays healthy and deployable.
+
+\subsubsection{Typical CI Checks in ML Projects}
+\begin{itemize}
+  \item \textbf{Code quality}: linting (ruff/flake8), formatting (black), type-checking (mypy)
+  \item \textbf{Unit tests}: dataset loaders, transforms, model forward pass
+  \item \textbf{Training sanity tests}: run 5--20 iterations on tiny data and confirm:
+    \begin{itemize}
+      \item no runtime crash
+      \item loss decreases
+      \item outputs have expected shapes
+    \end{itemize}
+  \item \textbf{Reproducibility tests} (optional but recommended):
+    \begin{itemize}
+      \item fixed seed yields consistent results for small runs
+    \end{itemize}
+\end{itemize}
+
+\subsection{CD: Continuous Delivery / Deployment}
+CD runs after CI passes. It automates:
+\begin{itemize}
+  \item building Docker images
+  \item pushing images to registries (GHCR, DockerHub, GCP Artifact Registry)
+  \item deploying to staging
+  \item optionally deploying to production
+\end{itemize}
+
+\subsubsection{CD in ML Has Two Meanings}
+In ML, delivery can refer to:
+\begin{itemize}
+  \item \textbf{Code delivery}: deploy training/inference software
+  \item \textbf{Model delivery}: promote and deploy a specific trained model artifact
+\end{itemize}
+
+\subsubsection{Safe Deployment Pattern}
+\begin{itemize}
+  \item deploy new version to staging
+  \item run smoke tests + basic inference tests
+  \item deploy gradually (canary rollout) when possible
+  \item keep rollback path (\texttt{model\_vX} $\rightarrow$ \texttt{model\_v(X-1)})
+\end{itemize}
+
+\section{MLOps: Full Model Lifecycle Management}
+
+\subsection{Why MLOps Is Needed}
+ML differs from classic software:
+\begin{itemize}
+  \item models depend on data quality and distributions
+  \item performance can degrade over time (data drift)
+  \item ``bugs'' may appear only as metric drops
+  \item retraining is often required
+\end{itemize}
+
+MLOps manages ML as a \textbf{continuous lifecycle}, not a one-time training script.
+
+\subsection{Core Components of MLOps}
+\subsubsection{(1) Data Management}
+\begin{itemize}
+  \item version datasets and splits (train/val/test)
+  \item document preprocessing and transforms
+  \item prevent leakage across splits
+  \item record dataset metadata and provenance
+\end{itemize}
+
+\subsubsection{(2) Experiment Tracking}
+Every run must log:
+\begin{itemize}
+  \item configuration (hyperparameters, seed)
+  \item metrics (loss, AUROC, F1, etc.)
+  \item code version (git commit hash)
+  \item artifacts (plots, confusion matrix)
+\end{itemize}
+
+Recommended tools:
+\begin{itemize}
+  \item TensorBoard (baseline)
+  \item Weights \& Biases (W\&B)
+  \item MLflow
+\end{itemize}
+
+\subsubsection{(3) Model Checkpointing and Model Registry}
+We distinguish:
+\begin{itemize}
+  \item \textbf{Checkpoints}: intermediate training states (\texttt{last.ckpt}, \texttt{epoch\_10.ckpt})
+  \item \textbf{Model version}: approved/published model artifact with metadata
+\end{itemize}
+
+A model registry tracks:
+\begin{itemize}
+  \item which model is in production
+  \item which dataset/training config produced it
+  \item evaluation metrics and approval status
+\end{itemize}
+
+\subsubsection{(4) Automated Pipelines}
+Automate training + evaluation:
+\begin{itemize}
+  \item ``train'' stage
+  \item ``evaluate'' stage
+  \item ``promote model'' stage if metrics pass
+\end{itemize}
+
+Typical tools:
+\begin{itemize}
+  \item Airflow, Kubeflow Pipelines, Vertex AI Pipelines
+\end{itemize}
+
+\subsubsection{(5) Deployment and Serving}
+Deploying a model means running inference:
+\begin{itemize}
+  \item batch inference jobs (HPC or cloud)
+  \item online inference (REST/gRPC service)
+  \item integration into clinical/research pipelines
+\end{itemize}
+
+Typical deployment tools:
+\begin{itemize}
+  \item FastAPI + Docker (lab internal)
+  \item BentoML / TorchServe / Triton (advanced)
+  \item KServe / Seldon (K8s-native)
+\end{itemize}
+
+\subsubsection{(6) Monitoring}
+Production monitoring includes:
+\begin{itemize}
+  \item latency (response time)
+  \item error rates
+  \item input data drift
+  \item prediction drift
+  \item degradation in downstream clinical performance (when labels exist)
+\end{itemize}
+
+\section{End-to-End Workflow (How Everything Connects)}
+
+\subsection{Standard Flow}
+\begin{enumerate}
+  \item Researcher proposes change (new model / preprocessing / metric).
+  \item Code is pushed as a PR.
+  \item \textbf{CI runs}: unit tests + sanity training + linting.
+  \item If CI passes: \textbf{CD builds} a Docker image and publishes it.
+  \item Image is deployed to staging (optional in academic setting).
+  \item Training jobs run using:
+    \begin{itemize}
+      \item Docker/Apptainer image (environment)
+      \item SLURM/K8s (execution scheduling)
+    \end{itemize}
+  \item Outputs logged to tracking system (TensorBoard/W\&B/MLflow).
+  \item Best model is promoted into registry and deployed.
+  \item Monitoring detects drift and triggers retraining when needed.
+\end{enumerate}
+
+\subsection{What This Achieves}
+\begin{itemize}
+  \item fewer broken experiments
+  \item fewer wasted GPU hours
+  \item faster onboarding
+  \item traceable results for publications
+  \item reliable path from research to deployment
+\end{itemize}
+
+\section{Lab Policy Checklist}
+
+\subsection{Minimum Requirements (All Projects)}
+\begin{itemize}
+  \item Training runs without code edits (CLI + YAML/JSON configs)
+  \item Logs saved per run (metrics + config + command)
+  \item Checkpoints saved (\texttt{last} + \texttt{best})
+  \item Deterministic seed option exists
+  \item Container recipe exists (\texttt{Dockerfile})
+\end{itemize}
+
+\subsection{Recommended Requirements (Research at Scale)}
+\begin{itemize}
+  \item CI pipeline (GitHub Actions recommended)
+  \item Automated training sanity tests in CI
+  \item Experiment tracking (W\&B or MLflow)
+  \item Model registry practice (artifact versioning)
+\end{itemize}
+
+\subsection{Optional (When Running Services)}
+\begin{itemize}
+  \item staging environment for deployments
+  \item monitoring for drift/performance
+  \item Kubernetes-based serving when multi-tenant
+\end{itemize}
+
+\section{Appendix: Minimal Templates}
+
+\subsection{Example: Minimal GitHub Actions CI}
+Create: \texttt{.github/workflows/ci.yml}
+\begin{lstlisting}[language=yaml]
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Lint
+        run: |
+          python -m compileall .
+
+      - name: Unit tests
+        run: |
+          pytest -q
+\end{lstlisting}
+
+\subsection{Example: CD Builds and Pushes Docker Image}
+\begin{lstlisting}[language=yaml]
+name: CD
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t mcv-project:latest .
+\end{lstlisting}
+
+\subsection{Example: Minimal Dockerfile for ML}
+\begin{lstlisting}[language=Docker]
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /workspace/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . /workspace
+
+CMD ["python", "scripts/train.py", "--help"]
+\end{lstlisting}
+
+\end{document}

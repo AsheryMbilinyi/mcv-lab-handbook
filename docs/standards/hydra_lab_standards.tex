@@ -1,0 +1,253 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{commentgreen}{rgb}{0.0,0.5,0.0}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  keywordstyle=\color{blue},
+  commentstyle=\color{commentgreen},
+  stringstyle=\color{red}
+}
+
+\title{\textbf{Lab Standard: Scalable ML Experimentation with Hydra}}
+\author{Medical Computer Vision Lab (MCV Lab)}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+This document defines the lab standard for using \textbf{Hydra} to manage machine learning experiments.
+Hydra is required for projects expected to scale across:
+\begin{itemize}[nosep]
+    \item multiple datasets / modalities
+    \item multiple architectures
+    \item multi-stage pipelines (pretrain $\rightarrow$ finetune $\rightarrow$ evaluate)
+    \item multiple sites/domains
+    \item HPC workloads (SLURM)
+\end{itemize}
+
+\section{Why Hydra (vs argparse)}
+Argument parsers are a good baseline. However, Hydra provides better scalability:
+\begin{enumerate}[label=\textbf{H\arabic*.}, leftmargin=*]
+    \item \textbf{Hierarchical configs} (clean separation of dataset/model/optimizer).
+    \item \textbf{Composable config groups} (\texttt{model=resnet50}, \texttt{dataset=rsna}).
+    \item \textbf{Automatic run directories} with saved configs.
+    \item \textbf{Built-in multirun sweeps} (\texttt{-m}).
+    \item \textbf{Less experiment glue code} and fewer hard-coded defaults.
+\end{enumerate}
+
+\section{Required Directory Structure}
+All Hydra-based training pipelines must follow this layout:
+
+\begin{lstlisting}
+project/
+  train.py
+  configs/
+    config.yaml
+    dataset/
+      rsna_trauma.yaml
+      mimic_ecg.yaml
+    model/
+      resnet50.yaml
+      vit_b16.yaml
+    optim/
+      adamw.yaml
+      sgd.yaml
+    trainer/
+      default.yaml
+\end{lstlisting}
+
+\section{Config Design Principles}
+\subsection{Rule 1: No code edits for experiments}
+All experiment variations must be expressed as config overrides.
+
+\subsection{Rule 2: Separate concerns}
+\begin{itemize}[nosep]
+    \item dataset configs must only contain dataset-related params
+    \item model configs must only contain model-related params
+    \item optim configs must only contain optimizer/scheduler params
+    \item trainer configs must contain training loop settings (epochs, amp, ckpt)
+\end{itemize}
+
+\subsection{Rule 3: Every run must be reproducible}
+Every run must:
+\begin{itemize}[nosep]
+    \item store the complete resolved config
+    \item store launch command
+    \item store outputs in a unique run directory
+\end{itemize}
+
+\section{Minimal Hydra Training Entry Point}
+Save as \texttt{train.py}:
+
+\begin{lstlisting}[language=Python]
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import random
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
+
+def set_seed(seed: int, deterministic: bool = False) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    if torch is not None:
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        if deterministic:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+
+@hydra.main(version_base=None, config_path="configs", config_name="config")
+def main(cfg: DictConfig) -> None:
+    # Hydra changes working directory into a run dir automatically
+    run_dir = Path(os.getcwd())
+
+    # Save resolved config
+    (run_dir / "config_resolved.yaml").write_text(
+        OmegaConf.to_yaml(cfg),
+        encoding="utf-8",
+    )
+
+    # Reproducibility
+    set_seed(int(cfg.seed), deterministic=bool(cfg.deterministic))
+
+    print("=== RUN DIR ===")
+    print(run_dir)
+
+    print("\n=== CONFIG ===")
+    print(OmegaConf.to_yaml(cfg))
+
+    # TODO:
+    # 1) build dataset based on cfg.dataset
+    # 2) build model based on cfg.model
+    # 3) build optimizer based on cfg.optim
+    # 4) implement training loop using cfg.trainer
+    print("\n[INFO] Training would start here.")
+
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\section{Hydra Base Config}
+Save as \texttt{configs/config.yaml}:
+
+\begin{lstlisting}
+defaults:
+  - dataset: rsna_trauma
+  - model: resnet50
+  - optim: adamw
+  - trainer: default
+  - _self_
+
+seed: 0
+deterministic: false
+
+# optional global experiment tags
+experiment:
+  name: baseline
+  project: mcv_lab
+\end{lstlisting}
+
+\section{Example Config Groups}
+
+\subsection{Dataset config}
+Save as \texttt{configs/dataset/rsna\_trauma.yaml}:
+\begin{lstlisting}
+name: rsna_trauma
+data_dir: /datasets/rsna
+num_workers: 4
+target: any_injury
+\end{lstlisting}
+
+\subsection{Model config}
+Save as \texttt{configs/model/resnet50.yaml}:
+\begin{lstlisting}
+name: resnet50
+pretrained: true
+in_channels: 3
+num_classes: 2
+\end{lstlisting}
+
+\subsection{Optimizer config}
+Save as \texttt{configs/optim/adamw.yaml}:
+\begin{lstlisting}
+name: adamw
+lr: 1e-4
+weight_decay: 1e-4
+scheduler: cosine
+\end{lstlisting}
+
+\subsection{Trainer config}
+Save as \texttt{configs/trainer/default.yaml}:
+\begin{lstlisting}
+epochs: 30
+batch_size: 16
+amp: true
+log_every: 50
+save_every: 1
+\end{lstlisting}
+
+\section{Standard Usage}
+\subsection{Single run}
+\begin{lstlisting}
+python train.py dataset=rsna_trauma model=resnet50 optim=adamw trainer=default
+\end{lstlisting}
+
+\subsection{Override parameters}
+\begin{lstlisting}
+python train.py model=resnet50 optim.lr=5e-5 seed=2
+\end{lstlisting}
+
+\subsection{Multi-run sweep (Hydra multirun)}
+\begin{lstlisting}
+python train.py -m optim.lr=1e-3,1e-4,1e-5 seed=0,1,2
+\end{lstlisting}
+
+\section{Lab Requirements for Hydra Projects}
+Before merging new Hydra projects:
+\begin{itemize}
+    \item Must use \texttt{configs/} with config groups
+    \item Must support \texttt{-m} sweeps
+    \item Must save resolved config in the run folder
+    \item Must never hardcode dataset/model params in \texttt{train.py}
+\end{itemize}
+
+\section{Recommended Extensions}
+\begin{itemize}
+    \item Add W\&B logging: log the Hydra resolved config
+    \item Add \texttt{hydra.job.name} to label experiments
+    \item Add \texttt{hydra.sweep.dir} for clean sweep directory naming
+\end{itemize}
+
+\end{document}

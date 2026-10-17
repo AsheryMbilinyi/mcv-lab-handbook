@@ -1,0 +1,5 @@
+epochs: 30
+batch_size: 16
+amp: true
+log_every: 50
+save_every: 1

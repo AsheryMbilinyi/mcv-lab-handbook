@@ -1,0 +1,4 @@
+name: rsna_trauma
+data_dir: /datasets/rsna
+num_workers: 4
+target: any_injury

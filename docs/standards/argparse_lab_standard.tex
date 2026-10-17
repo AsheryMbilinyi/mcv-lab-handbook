@@ -1,0 +1,521 @@
+\documentclass[11pt]{article}
+
+% -------------------- Packages --------------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{courier}
+
+% -------------------- Hyperref Setup --------------------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+% -------------------- Header/Footer --------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MCV lab}
+\rhead{Scalable ML Experimentation}
+\cfoot{\thepage}
+
+% -------------------- Section Formatting --------------------
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.8em}{}
+
+\titlespacing*{\section}{0pt}{1.5em}{0.8em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.5em}
+
+% -------------------- Global List Formatting --------------------
+\setlist[itemize]{
+  label={-},
+  leftmargin=2em,
+  labelsep=0.6em,
+  itemsep=0.2em
+}
+\setlist[itemize,2]{itemsep=0.15em}
+\setlist[enumerate]{leftmargin=2em,itemsep=0.15em}
+
+% -------------------- Listings / Code Style --------------------
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{commentgreen}{rgb}{0.0,0.5,0.0}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  keywordstyle=\color{blue},
+  commentstyle=\color{commentgreen},
+  stringstyle=\color{red},
+  columns=fullflexible,
+  keepspaces=true,
+  tabsize=4,
+  xleftmargin=0.02\textwidth,
+  xrightmargin=0.02\textwidth
+}
+
+% % -------------------- Document Metadata --------------------
+% \title{\textbf{Lab Standard: Scalable ML Experimentation with Argument Parsers}}
+% \author{Medical Computer Vision Lab (MCV Lab)}
+% \date{\today}
+
+% \begin{document}
+% \maketitle
+
+% \tableofcontents
+% \newpage
+
+% -------------------- Document Metadata --------------------
+\title{\textbf{Medical Computer Vision Lab \\ \small{
+Scalable ML Experimentation with Argument Parsers: Lab Standard}}}
+\author{Maintainer: Ashery Mbilinyi}
+\date{Version 1.0 : \today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+
+
+% % -------------------- Abstract (new page + included in ToC) --------------------
+% \addcontentsline{toc}{section}{Abstract}
+% \begin{abstract}
+% This document defines our lab standard for writing scalable machine learning (ML) experiments code using argument parsers.
+% It ensures experiments are reproducible, auditable, scalable, and easy to run by new lab members without modifying source code.
+% \end{abstract}
+% \newpage
+
+\section{Purpose}
+This document defines our lab standard for writing scalable machine learning (ML) experiment code using argument parsers.
+The goal is to ensure our experiments are:
+\begin{itemize}
+    \item \textbf{Reproducible}: every run can be reproduced exactly
+    \item \textbf{Auditable}: every result is traceable to a configuration
+    \item \textbf{Scalable}: easy to run hundreds of experiments on local machines, servers, and HPC clusters
+    \item \textbf{Collaborative}: new students can run baselines without modifying code
+\end{itemize}
+
+\section{Why Argument Parsers Enable Scalability}
+Argument parsers (e.g., Python \texttt{argparse}, Hydra, Typer) improve scalability by turning scripts into \textbf{configurable tools} rather than one-off code.
+
+\subsection{Key Benefits}
+\begin{itemize}
+    \item \textbf{\small Eliminates code editing for experimentation}.\\
+    Parameters should not require editing the training script. Instead, experiments are configured from the command line.
+
+    \item \textbf{Reproducibility at scale}.\\
+    Each run can save its full configuration (\texttt{config.json}, \texttt{cmd.txt}), enabling exact reproduction months later.
+
+    \item \textbf{Simple sweeps and automation}.\\
+    Sweeps become trivial through bash loops, schedulers, or frameworks (SLURM, Ray Tune, W\&B sweeps).
+
+    \item \textbf{HPC and pipeline compatibility}.\\
+    Cluster job submission is easiest when scripts take structured arguments and output to predictable directories.
+
+    \item \textbf{Safer experiments}.\\
+    Parsers support type-checking, required fields, and limited choices, reducing wasted GPU runs.
+\end{itemize}
+
+\section{Lab Policy: No Code Changes for Experiments}
+
+\subsection{Rule}
+\textbf{Model experimentation must not require changing source code.}
+
+\subsection{Allowed Ways to Configure Experiments}
+\begin{itemize}
+    \item CLI arguments (\texttt{--lr}, \texttt{--batch\_size}, \texttt{--seed}, etc.)
+    \item Config files (\texttt{--config configs/baseline.json})
+\end{itemize}
+
+\subsection{Disallowed}
+\begin{itemize}
+    \item Editing constants inside scripts (learning rate, batch size, epochs)
+    \item Hardcoding dataset paths in code
+    \item Changing the script for each experiment
+\end{itemize}
+
+\section{Standard Experiment Output Structure}
+Every experiment run should create a unique run directory containing:
+\begin{itemize}
+    \item \texttt{config.json} : resolved configuration used for the run
+    \item \texttt{cmd.txt} : command used to launch the run
+    \item \texttt{checkpoints/} : saved model checkpoints
+    \item \texttt{logs/} or metrics files
+\end{itemize}
+
+Example:
+\begin{lstlisting}
+runs/
+  rsna_trauma_resnet50_lr0.0001_20260110_215000/
+    config.json
+    cmd.txt
+    checkpoints/
+      last.ckpt
+      best.ckpt
+\end{lstlisting}
+
+\section{Core Arguments Required in All Training Scripts}
+At minimum, every training script must support:
+
+\subsection{Experiment / Logging}
+\begin{itemize}
+    \item \texttt{--run\_name} (auto-generated if empty)
+    \item \texttt{--out\_dir} (default: \texttt{runs})
+\end{itemize}
+
+\subsection{Dataset}
+\begin{itemize}
+    \item \texttt{--dataset} (choices must be enforced)
+    \item \texttt{--data\_dir}
+    \item \texttt{--num\_workers}
+\end{itemize}
+
+\subsection{Model}
+\begin{itemize}
+    \item \texttt{--model} (choices enforced)
+    \item \texttt{--pretrained}
+\end{itemize}
+
+\subsection{Optimization}
+\begin{itemize}
+    \item \texttt{--epochs}
+    \item \texttt{--batch\_size}
+    \item \texttt{--lr}
+    \item \texttt{--weight\_decay}
+    \item \texttt{--optimizer} (choices enforced)
+    \item \texttt{--scheduler} (choices enforced)
+\end{itemize}
+
+\subsection{Reproducibility}
+\begin{itemize}
+    \item \texttt{--seed}
+    \item \texttt{--deterministic}
+\end{itemize}
+
+\subsection{Hardware}
+\begin{itemize}
+    \item \texttt{--device} (cpu/cuda/mps)
+    \item \texttt{--amp}
+\end{itemize}
+
+\subsection{Resume / Checkpointing}
+\begin{itemize}
+    \item \texttt{--resume} (checkpoint path)
+\end{itemize}
+
+\subsection{Config File Support (Mandatory)}
+\begin{itemize}
+    \item \texttt{--config} (JSON/YAML config)
+\end{itemize}
+
+\section{Standard CLI Usage Examples}
+
+\subsection{Baseline run}
+\begin{lstlisting}
+python train.py --dataset rsna_trauma --model resnet50 --lr 1e-4 --seed 0 --amp
+\end{lstlisting}
+
+\subsection{Config-based run}
+\begin{lstlisting}
+python train.py --config configs/baseline.json
+\end{lstlisting}
+
+\subsection{Config run with overrides}
+\begin{lstlisting}
+python train.py --config configs/baseline.json --lr 5e-5 --seed 2
+\end{lstlisting}
+
+\subsection{Sweeps}
+\begin{lstlisting}
+for seed in 0 1 2; do
+  for lr in 1e-3 1e-4 1e-5; do
+    python train.py \
+      --dataset rsna_trauma \
+      --model resnet50 \
+      --lr $lr \
+      --seed $seed \
+      --amp
+  done
+done
+\end{lstlisting}
+
+\section{Recommended Implementation Template}
+Below is the lab standard \texttt{argparse} training entrypoint template. Students may adapt it, but required fields and output structure must remain consistent.
+
+\subsection{Full Reference Template}
+\begin{lstlisting}[language=Python]
+#!/usr/bin/env python3
+"""
+train.py - scalable training entrypoint template
+
+Usage:
+  python train.py --dataset mimic_ecg --model resnet18 --lr 1e-4 --seed 0
+  python train.py --config configs/baseline.json --batch_size 64
+  python train.py --resume runs/exp_001/checkpoints/last.ckpt
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import shutil
+import sys
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
+
+def set_seed(seed: int, deterministic: bool = False) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+
+    if torch is not None:
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+
+        if deterministic:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+
+@dataclass
+class TrainConfig:
+    # Experiment / logging
+    run_name: str
+    out_dir: str
+    save_every: int
+    log_every: int
+
+    # Dataset
+    dataset: str
+    data_dir: str
+    num_workers: int
+
+    # Model
+    model: str
+    pretrained: bool
+
+    # Optimization
+    epochs: int
+    batch_size: int
+    lr: float
+    weight_decay: float
+    optimizer: str
+    scheduler: str
+
+    # Reproducibility
+    seed: int
+    deterministic: bool
+
+    # Hardware
+    device: str
+    amp: bool
+
+    # Resume
+    resume: str | None
+
+
+def timestamp() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def ensure_dir(path: str | Path) -> Path:
+    path = Path(path)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def dump_json(path: Path, obj: dict[str, Any]) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=2, sort_keys=True)
+
+
+def load_json(path: str | Path) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_run_config(run_dir: Path, cfg: TrainConfig, argv: list[str]) -> None:
+    dump_json(run_dir / "config.json", asdict(cfg))
+    (run_dir / "cmd.txt").write_text("python " + " ".join(argv) + "\n", encoding="utf-8")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="train.py",
+        description="Scalable training entrypoint",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    g = parser.add_argument_group("Experiment / Logging")
+    g.add_argument("--run_name", type=str, default="", help="Run name (auto if empty).")
+    g.add_argument("--out_dir", type=str, default="runs", help="Base output directory.")
+    g.add_argument("--save_every", type=int, default=1, help="Checkpoint every N epochs.")
+    g.add_argument("--log_every", type=int, default=50, help="Log every N steps.")
+
+    g = parser.add_argument_group("Dataset")
+    g.add_argument(
+        "--dataset",
+        type=str,
+        default="dummy",
+        choices=["dummy", "ptbxl", "mimic_ecg", "rsna_trauma"],
+    )
+    g.add_argument("--data_dir", type=str, default="data")
+    g.add_argument("--num_workers", type=int, default=4)
+
+    g = parser.add_argument_group("Model")
+    g.add_argument(
+        "--model",
+        type=str,
+        default="resnet18",
+        choices=["resnet18", "resnet50", "unet", "vit_b16"],
+    )
+    g.add_argument("--pretrained", action="store_true")
+
+    g = parser.add_argument_group("Optimization")
+    g.add_argument("--epochs", type=int, default=50)
+    g.add_argument("--batch_size", type=int, default=32)
+    g.add_argument("--lr", type=float, default=1e-4)
+    g.add_argument("--weight_decay", type=float, default=1e-4)
+    g.add_argument("--optimizer", type=str, default="adamw", choices=["sgd", "adam", "adamw"])
+    g.add_argument("--scheduler", type=str, default="cosine", choices=["none", "step", "cosine"])
+
+    g = parser.add_argument_group("Reproducibility")
+    g.add_argument("--seed", type=int, default=0)
+    g.add_argument("--deterministic", action="store_true",
+                   help="Force deterministic behavior (slower).")
+
+    g = parser.add_argument_group("Hardware")
+    g.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu", "mps"])
+    g.add_argument("--amp", action="store_true", help="Enable mixed precision.")
+
+    g = parser.add_argument_group("Resume")
+    g.add_argument("--resume", type=str, default=None)
+
+    parser.add_argument("--config", type=str, default=None,
+                        help="Optional JSON config to load defaults from.")
+
+    return parser
+
+
+def parse_args_with_config(parser: argparse.ArgumentParser, argv: list[str]) -> argparse.Namespace:
+    partial, _ = parser.parse_known_args(argv)
+
+    if partial.config is not None:
+        cfg = load_json(partial.config)
+        parser.set_defaults(**cfg)
+
+    args = parser.parse_args(argv)
+    return args
+
+
+def train(cfg: TrainConfig, run_dir: Path) -> None:
+    print(json.dumps(asdict(cfg), indent=2))
+    set_seed(cfg.seed, deterministic=cfg.deterministic)
+
+    # TODO: implement actual training loop
+    print(f"Training would run here. Outputs at: {run_dir}")
+
+
+def main(argv: list[str]) -> int:
+    parser = build_parser()
+    args = parse_args_with_config(parser, argv)
+
+    if args.run_name.strip() == "":
+        args.run_name = f"{args.dataset}_{args.model}_lr{args.lr}_{timestamp()}"
+
+    base_out = Path(args.out_dir)
+    run_dir = ensure_dir(base_out / args.run_name)
+    ensure_dir(run_dir / "checkpoints")
+
+    if args.config is not None:
+        shutil.copy(args.config, run_dir / "config_used.json")
+
+    cfg = TrainConfig(
+        run_name=args.run_name,
+        out_dir=str(run_dir),
+        save_every=args.save_every,
+        log_every=args.log_every,
+        dataset=args.dataset,
+        data_dir=args.data_dir,
+        num_workers=args.num_workers,
+        model=args.model,
+        pretrained=args.pretrained,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        optimizer=args.optimizer,
+        scheduler=args.scheduler,
+        seed=args.seed,
+        deterministic=args.deterministic,
+        device=args.device,
+        amp=args.amp,
+        resume=args.resume,
+    )
+
+    save_run_config(run_dir, cfg, argv)
+    train(cfg, run_dir)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
+\end{lstlisting}
+
+\section{Config File Example}
+Example file: \texttt{configs/baseline.json}
+\begin{lstlisting}
+{
+  "dataset": "rsna_trauma",
+  "data_dir": "/datasets/rsna",
+  "model": "resnet50",
+  "epochs": 30,
+  "batch_size": 16,
+  "lr": 0.0001,
+  "optimizer": "adamw",
+  "scheduler": "cosine",
+  "seed": 0,
+  "amp": true
+}
+\end{lstlisting}
+
+\section{Checklist for Code Reviews}
+Before merging new training pipelines into the lab repo, ensure:
+\begin{itemize}
+    \item Training can run fully from CLI with no code edits
+    \item \texttt{--config} works and CLI overrides it
+    \item Every run saves \texttt{config.json} and \texttt{cmd.txt}
+    \item Output directory structure matches lab standard
+    \item Seed is set and reproducibility toggles exist
+    \item Dataset/model/optimizer use \texttt{choices} where applicable
+\end{itemize}
+
+\section{Recommended Extensions (Optional)}
+\begin{itemize}
+    \item Add W\&B or MLflow logging of the full config
+    \item Add validation that checks incompatible arguments
+    \item Add support for YAML configs (OmegaConf)
+    \item Upgrade to Hydra for hierarchical config management
+\end{itemize}
+
+\end{document}
