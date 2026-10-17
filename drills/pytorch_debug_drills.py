@@ -125,30 +125,55 @@ def _banner(title):
 
 # ---------------------------------------------------------------------------
 # Scenario 1 — missing optimizer.zero_grad()
-#   Symptom: loss decreases for a step or two then goes haywire /
-#   plateaus much higher than expected. Gradients from every step keep
-#   accumulating on top of each other (PyTorch grads are additive by design,
-#   to support gradient accumulation over multiple micro-batches).
+#   Symptom: the loss drops for the first few steps, then turns erratic and
+#   spikes, while the correct run falls smoothly. Gradients from every step
+#   keep accumulating on top of each other (PyTorch grads are additive by
+#   design, to support gradient accumulation over multiple micro-batches),
+#   so each update is no longer the gradient of the current batch.
+#   Beware: on a tiny convex problem the pile-up just acts like a larger
+#   step size and can even look *better*, which is why this bug is easy to
+#   miss. That is why this demo uses a small MLP, mini-batches and a
+#   learning rate that is fine when gradients are cleared.
 # ---------------------------------------------------------------------------
+def _scenario_1_run(zero_grad: bool):
+    """Train a small MLP on mini-batches, with or without ``zero_grad()``.
+
+    Both variants draw the same mini-batches, so the only difference is
+    whether stale gradients are cleared.
+
+    Args:
+        zero_grad: Whether to call ``opt.zero_grad()`` before every step.
+
+    Returns:
+        The training loss at every step.
+    """
+    set_seed(0)
+    X, y = _toy_classification_data(n=256)
+    model = nn.Sequential(nn.Linear(20, 64), nn.ReLU(), nn.Linear(64, 3))
+    opt = torch.optim.SGD(model.parameters(), lr=0.3)
+    batches = torch.Generator().manual_seed(1)
+    losses = []
+    for step in range(50):
+        idx = torch.randint(0, len(y), (32,), generator=batches)
+        if zero_grad:
+            opt.zero_grad()  # clear stale gradients from the previous step
+        # else: opt.zero_grad() is MISSING here
+        loss = F.cross_entropy(model(X[idx]), y[idx])
+        loss.backward()
+        opt.step()
+        losses.append(loss.item())
+    return losses
+
+
 def scenario_1_buggy():
     """Train without ``zero_grad()`` so gradients pile up.
 
     Returns:
         The training loss at every step.
     """
-    set_seed(0)
-    X, y = _toy_classification_data()
-    model = nn.Linear(20, 3)
-    opt = torch.optim.SGD(model.parameters(), lr=0.05)
-    losses = []
-    for step in range(50):
-        # opt.zero_grad() is MISSING here
-        logits = model(X)
-        loss = F.cross_entropy(logits, y)
-        loss.backward()
-        opt.step()
-        losses.append(loss.item())
-    print("buggy   (no zero_grad):", [round(v, 3) for v in losses[::10]])
+    losses = _scenario_1_run(zero_grad=False)
+    shown = losses[::10] + [losses[-1]]
+    print("buggy   (no zero_grad):", [round(v, 2) for v in shown])
     return losses
 
 
@@ -158,19 +183,9 @@ def scenario_1_fixed():
     Returns:
         The training loss at every step.
     """
-    set_seed(0)
-    X, y = _toy_classification_data()
-    model = nn.Linear(20, 3)
-    opt = torch.optim.SGD(model.parameters(), lr=0.05)
-    losses = []
-    for step in range(50):
-        opt.zero_grad()  # clear stale gradients from the previous step
-        logits = model(X)
-        loss = F.cross_entropy(logits, y)
-        loss.backward()
-        opt.step()
-        losses.append(loss.item())
-    print("fixed   (with zero_grad):", [round(v, 3) for v in losses[::10]])
+    losses = _scenario_1_run(zero_grad=True)
+    shown = losses[::10] + [losses[-1]]
+    print("fixed   (with zero_grad):", [round(v, 2) for v in shown])
     return losses
 
 
@@ -386,8 +401,8 @@ def scenario_4_diagnostic_walkthrough():
        transformers without warmup)
      - log(0) / division by zero in a custom loss (see Scenario 5)
      - unnormalized inputs with large magnitude
-     - mixed precision (fp16) underflow/overflow -> use torch.cuda.amp's
-       GradScaler, which exists specifically to prevent this
+     - mixed precision (fp16) underflow/overflow -> use
+       torch.amp.GradScaler, which exists specifically to prevent this
      - a learning rate scheduler warming up too fast, or a loss weight
        that's too large in a multi-term loss
 """)
@@ -453,7 +468,9 @@ def scenario_5_fixed():
 # Scenario 6 — silent shape broadcast bug
 #   Symptom: no crash, no NaN, model trains and loss even goes down — but
 #   final accuracy is much worse than it should be. These are the worst
-#   bugs precisely because nothing errors.
+#   bugs precisely because nothing errors. (F.mse_loss does print a
+#   UserWarning for this case, but it is easy to miss in training logs,
+#   and a hand-written (pred - target) ** 2 prints nothing at all.)
 #   MSE between predictions shaped (N, 1) and targets shaped (N,) broadcasts
 #   to an (N, N) matrix instead of elementwise (N,) — every prediction gets
 #   compared against every target.
@@ -502,8 +519,9 @@ def scenario_6_fixed():
     )
     print(
         "        Rule of thumb: assert shapes right before every loss call. "
-        "PyTorch will not warn you about a broadcast that 'succeeds' but "
-        "means something different than what you intended."
+        "PyTorch often will not warn you about a broadcast that "
+        "'succeeds' but means something different than what you "
+        "intended."
     )
     return loss.item()
 

@@ -37,8 +37,9 @@ script.
 
 **3. Check shapes at the loss.** `assert pred.shape == target.shape` (or the
 expected relationship) immediately before every loss call. Broadcasting bugs
-don't crash — they silently compute the wrong thing and are the hardest
-class of bug to catch by staring at code (Scenario 6).
+don't crash. They compute the wrong thing, at best with an easy-to-miss
+warning, and are the hardest class of bug to catch by staring at code
+(Scenario 6).
 
 **4. Print the first-iteration loss value and sanity-check its scale.**
 For `k`-way classification with random-ish predictions,
@@ -130,7 +131,7 @@ Two things people typically miss:
    - Unnormalized inputs with large magnitude feeding into an unstable loss
      landscape.
    - Mixed precision (fp16) underflow/overflow. Use
-     `torch.cuda.amp.GradScaler`, which exists precisely to keep small
+     `torch.amp.GradScaler`, which exists precisely to keep small
      gradients from underflowing to zero and large ones from overflowing to
      inf in fp16.
    - A learning-rate scheduler warming up too fast, or one term in a
@@ -142,8 +143,8 @@ Two things people typically miss:
 |---|---|
 | Loss is `nan` after a few steps, climbing fast before that | LR too high / exploding gradients — add clipping, lower LR |
 | Loss is `nan` or `inf` from step 0–1 | `log(0)`, division by zero, or bad/unnormalized input data |
-| Loss decreases, then jumps up periodically | LR too high for some batches, or a data-loading bug feeding a corrupt batch |
-| Loss barely moves at all | LR too low, a frozen layer, `zero_grad()` never called so grads accumulate destructively, or gradients not reaching the parameters (check step 6) |
+| Loss decreases, then jumps up or turns erratic | LR too high for some batches, a data-loading bug feeding a corrupt batch, or `zero_grad()` never called so stale gradients pile up (Scenario 1) |
+| Loss barely moves at all | LR too low, a frozen layer, or gradients not reaching the parameters (check step 6) |
 | Loss looks fine, but accuracy is much worse than expected | Shape/broadcast bug in the loss (Scenario 6), or a train/val label mismatch |
 | Val metrics noisy / worse than expected / not reproducible | Forgot `model.eval()` (Scenario 3) |
 | Model trains but a re-run of the *same* code gives different results | Missing seed somewhere — often DataLoader workers, or `cudnn.benchmark=True` |
