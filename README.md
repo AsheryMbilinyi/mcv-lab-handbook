@@ -26,11 +26,26 @@ debugging ML experiments, runnable debugging drills, and a project template.
 
 ## Getting started
 
+To read the standards you need nothing: open the PDFs in
+`docs/standards/pdf/`, which GitHub renders in the browser.
+
+Everything else needs Python 3.10 or newer. Clone the repository and
+create a virtual environment:
+
 ```bash
-git clone <this repository>
+git clone https://github.com/AsheryMbilinyi/mcv-lab-handbook.git
 cd mcv-lab-handbook
 python -m venv .venv
 source .venv/bin/activate
+```
+
+Then install only what you need:
+
+```bash
+# To run the debugging drills (NumPy and PyTorch)
+pip install -r requirements.txt
+
+# To contribute (adds the lint tools and the pre-commit hooks)
 pip install -r requirements-dev.txt
 pre-commit install
 ```
