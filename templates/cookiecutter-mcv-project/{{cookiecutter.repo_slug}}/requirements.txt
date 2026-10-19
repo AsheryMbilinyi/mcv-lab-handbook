@@ -9,6 +9,9 @@ torchvision
 hydra-core
 omegaconf
 
-# recommended logging tools
+# experiment tracking (src/utils/tracking.py)
+mlflow
+
+# other recommended logging tools
 tensorboard
 wandb

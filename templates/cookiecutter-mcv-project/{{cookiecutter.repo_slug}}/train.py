@@ -8,12 +8,15 @@ for example ``python train.py model=resnet50 optim.lr=5e-5 seed=2``.
 from __future__ import annotations
 
 import os
+from contextlib import nullcontext
 from pathlib import Path
 
 import hydra
+import mlflow
 from omegaconf import DictConfig, OmegaConf
 
 from src.utils.seed import set_seed
+from src.utils.tracking import is_main_process, start_run
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
@@ -25,7 +28,8 @@ def main(cfg: DictConfig) -> None:
 
     Side effects:
         Writes ``config_resolved.yaml`` and a placeholder checkpoint into
-        the Hydra run directory, which is also the working directory.
+        the Hydra run directory, which is also the working directory, and
+        logs the run to the MLflow store in ``cfg.tracking``.
     """
     # Hydra changes the working directory to the run directory because
     # hydra.job.chdir is true.
@@ -50,10 +54,28 @@ def main(cfg: DictConfig) -> None:
     print("\n=== CONFIG ===")
     print(OmegaConf.to_yaml(cfg))
 
-    # Placeholder checkpoint write. Replace it with real checkpointing.
-    ckpt_dir = run_dir / "checkpoints"
-    ckpt_dir.mkdir(exist_ok=True)
-    (ckpt_dir / "last.ckpt").write_text("dummy checkpoint", encoding="utf-8")
+    # The run is marked failed if anything in this block raises. Under
+    # DDP only rank 0 tracks, so the job is one run. Guard every mlflow
+    # call with is_main_process() as well: a call made without an active
+    # run silently starts a new one.
+    main_process = is_main_process()
+    with start_run(cfg) if main_process else nullcontext():
+        if main_process:
+            mlflow.log_artifact(str(run_dir / "config_resolved.yaml"))
+
+        # Train here. Log metrics with their step, every
+        # cfg.trainer.log_every steps:
+        #   if main_process:
+        #       mlflow.log_metric("train/loss", loss.item(), step=step)
+
+        # Placeholder checkpoint write. Replace it with real checkpointing,
+        # then upload the best checkpoint from rank 0:
+        #   mlflow.log_artifact(str(best), artifact_path="checkpoints")
+        ckpt_dir = run_dir / "checkpoints"
+        ckpt_dir.mkdir(exist_ok=True)
+        (ckpt_dir / "last.ckpt").write_text(
+            "dummy checkpoint", encoding="utf-8"
+        )
 
     print("\n[INFO] Done.")
 

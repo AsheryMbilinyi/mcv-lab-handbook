@@ -12,6 +12,16 @@ experiment:
   project: mcv_lab
   name: baseline
 
+# MLflow tracking store. The paths must be absolute: Hydra changes into the
+# run directory before train.py runs, so a relative path would give every
+# run its own store. ${hydra:runtime.cwd} is the directory you launched
+# from, normally the project root. To log to a tracking server instead,
+# override on the command line:
+#   tracking.uri=http://<host>:5000 tracking.artifact_root=null
+tracking:
+  uri: sqlite:///${hydra:runtime.cwd}/mlflow.db
+  artifact_root: ${hydra:runtime.cwd}/mlartifacts
+
 hydra:
   run:
     dir: runs/${experiment.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}

@@ -32,4 +32,5 @@ def train_loop(*, cfg: Any) -> None:
     for epoch in range(int(cfg.trainer.epochs)):
         state.epoch = epoch
         # TODO: Iterate the data loader, then run forward, backward,
-        # optimize, log and checkpoint.
+        # optimize, log and checkpoint. Log metrics with
+        # mlflow.log_metric(name, value, step=state.step).
