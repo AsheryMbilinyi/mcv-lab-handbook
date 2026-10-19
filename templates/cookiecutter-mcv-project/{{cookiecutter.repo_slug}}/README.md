@@ -9,6 +9,7 @@ This repository follows the **MCV Lab Experimentation Standard**:
 - SLURM scripts included for HPC
 
 ## Setup
+Use Python 3.10 to 3.13. Hydra 1.3 fails at startup on Python 3.14.
 ```bash
 python -m venv .venv
 source .venv/bin/activate

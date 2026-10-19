@@ -71,6 +71,9 @@ pip install cookiecutter
 cookiecutter templates/cookiecutter-mcv-project
 ```
 
+Generated projects need Python 3.10 to 3.13. They use Hydra 1.3, which
+fails at startup on Python 3.14 (`ValueError: badly formed help string`).
+
 The generated project already meets the minimum requirements in section 6.2
 of the coding standard: a `README.md` with setup and usage, a
 reproducible environment file, and tool configuration (`pyproject.toml`,
