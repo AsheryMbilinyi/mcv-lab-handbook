@@ -2,7 +2,8 @@
 
 Shared reference material for the Medical Computer Vision (MCV) Lab at the
 University of Victoria: our coding and experimentation standards, a guide to
-debugging ML experiments, runnable debugging drills, and a project template.
+debugging ML experiments, runnable debugging drills, a guide to tracking
+experiments with MLflow, and a project template.
 
 ## What is in this repository
 
@@ -10,7 +11,8 @@ debugging ML experiments, runnable debugging drills, and a project template.
 |---|---|
 | `docs/standards/` | LaTeX sources of the lab standards (see below). Built PDFs are in `docs/standards/pdf/`. |
 | `docs/debugging_guide.md` | A step-by-step process for debugging a model that will not train, with a symptom to cause cheat sheet. |
-| `drills/pytorch_debug_drills.py` | Six runnable "spot the bug" scenarios that go with the guide. |
+| `docs/mlflow_guide.md` | How to track experiments with MLflow in a project made from the template, locally and on SLURM. |
+| `drills/pytorch_debug_drills.py` | Six runnable "spot the bug" scenarios that go with the debugging guide. |
 | `templates/cookiecutter-mcv-project/` | Starter for a new experiment repository (Hydra configs, SLURM scripts, trainer skeleton). |
 
 ### The standards

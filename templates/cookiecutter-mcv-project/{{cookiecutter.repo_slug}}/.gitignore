@@ -33,6 +33,8 @@ slurm_logs/
 checkpoints/
 wandb/
 mlruns/
+mlartifacts/
+mlflow.db
 logs/
 
 # Data
