@@ -9,7 +9,7 @@ import numpy as np
 try:
     import torch
 except ImportError:
-    torch = None
+    torch = None  # type: ignore[assignment]
 
 
 def set_seed(seed: int, deterministic: bool = False) -> None:
